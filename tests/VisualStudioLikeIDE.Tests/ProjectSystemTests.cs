@@ -115,4 +115,46 @@ public sealed class ProjectSystemTests
 
         Assert.Throws<GraphFormatException>(() => VisualProject.Load(project.ProjectFilePath));
     }
+
+    [Fact]
+    public void ReferencesComeFromHintPathsAndRestoredPackages()
+    {
+        using var directory = new TemporaryDirectory();
+        string csproj = Path.Combine(directory.Path, "App.csproj");
+        File.WriteAllText(csproj, """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="Foo" Version="1.0.0" />
+                <Reference Include="Local"><HintPath>lib\Local.dll</HintPath></Reference>
+              </ItemGroup>
+            </Project>
+            """);
+        Directory.CreateDirectory(Path.Combine(directory.Path, "lib"));
+        File.WriteAllText(Path.Combine(directory.Path, "lib", "Local.dll"), "");
+
+        Assert.Equal((1, true), (ProjectReferences.Resolve(csproj).AssemblyPaths.Count, ProjectReferences.Resolve(csproj).PackagesNotRestored));
+
+        string packages = Path.Combine(directory.Path, "packages");
+        string foo = Path.Combine(packages, "foo", "1.0.0", "lib", "net8.0", "Foo.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(foo)!);
+        File.WriteAllText(foo, "");
+        Directory.CreateDirectory(Path.Combine(directory.Path, "obj"));
+        File.WriteAllText(Path.Combine(directory.Path, "obj", "project.assets.json"), $$"""
+            {
+              "targets": {
+                "net10.0": {
+                  "Foo/1.0.0": { "type": "package", "compile": { "lib/net8.0/Foo.dll": {} } },
+                  "Bar/2.0.0": { "type": "package", "compile": { "lib/net10.0/_._": {} } }
+                }
+              },
+              "libraries": { "Foo/1.0.0": { "path": "foo/1.0.0" }, "Bar/2.0.0": { "path": "bar/2.0.0" } },
+              "packageFolders": { {{System.Text.Json.JsonSerializer.Serialize(packages + Path.DirectorySeparatorChar)}}: {} }
+            }
+            """);
+
+        ProjectReferences references = ProjectReferences.Resolve(csproj);
+
+        Assert.False(references.PackagesNotRestored);
+        Assert.Equal([Path.Combine(directory.Path, "lib", "Local.dll"), foo], references.AssemblyPaths.Order(StringComparer.OrdinalIgnoreCase));
+    }
 }

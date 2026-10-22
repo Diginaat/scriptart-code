@@ -32,7 +32,14 @@ internal static class Program
             return 2;
         }
 
-        ProjectGenerationResult generation = project.Generate(new GraphCompiler(NodeLibrary.CreateDefault()));
+        // Package methods are only known after restore, which a fresh checkout has not run yet.
+        if (project.References.PackagesNotRestored
+            && await DotNetCli.RestoreAsync(project.CsprojPath, Console.WriteLine, CancellationToken.None).ConfigureAwait(false) != 0)
+        {
+            return 1;
+        }
+
+        ProjectGenerationResult generation = project.Generate(new GraphCompiler(NodeLibrary.CreateDefault(project.References.AssemblyPaths)));
         foreach (GraphDiagnostic diagnostic in generation.Diagnostics)
         {
             await Console.Error.WriteLineAsync(Describe(project, diagnostic)).ConfigureAwait(false);

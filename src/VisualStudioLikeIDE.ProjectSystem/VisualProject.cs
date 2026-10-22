@@ -158,6 +158,9 @@ public sealed class VisualProject
         AtomicFile.WriteAllText(ProjectFilePath, ProjectSerializer.Serialize(Document));
     }
 
+    /// <summary>The assemblies the <c>.csproj</c> references, read from disk on each call because restore and the user can change them.</summary>
+    public ProjectReferences References => ProjectReferences.Resolve(CsprojPath);
+
     /// <summary>Compiles every graph in memory without writing anything.</summary>
     public (List<GraphDiagnostic> Diagnostics, List<GeneratedSource> Sources) CompileGraphs(GraphCompiler compiler)
     {
@@ -196,7 +199,7 @@ public sealed class VisualProject
             source,
             graphs.First(graph => GraphCompiler.GeneratedFileName(graph.Graph) == source.RelativePath).Graph.Id))];
         verification.AddRange(HandwrittenSources().Select(path => new VerificationSource(path, File.ReadAllText(path))));
-        diagnostics.AddRange(RoslynVerifier.Verify(Document.Name, verification, isExecutable: true));
+        diagnostics.AddRange(RoslynVerifier.Verify(Document.Name, verification, isExecutable: true, References.AssemblyPaths));
         if (diagnostics.Any(diagnostic => diagnostic.IsError))
         {
             return new ProjectGenerationResult(diagnostics, sources, []);

@@ -428,6 +428,10 @@ public sealed partial class MainWindow : Window
         OutputEditor.Text = "";
         ProjectText.Text = $"{project.Name}  ·  {project.DirectoryPath}";
         ShowOpenGraph();
+        if (project.References.PackagesNotRestored)
+        {
+            SetStatus("The project's NuGet packages are not restored yet. Build once (Ctrl+Shift+B) to add their methods to the palette.");
+        }
     }
 
     /// <summary>Shows the workspace's open graph in the canvas, palette, graph list, and panels.</summary>

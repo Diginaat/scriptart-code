@@ -28,9 +28,11 @@ Done: exceptions. The Try node runs its Try block, a Catch block with the error'
 
 Done: lists and `foreach`. Variables, parameters, and return values can be `List<T>` of the four simple types. Lists nodes create, add, set, get, remove, clear, count, and search; For Each loops over a list; Split Text and Join Text convert between text and lists (D-020). See the `Collections` sample.
 
-Next: calling external .NET APIs.
+Done: calling .NET methods. Methods of `Math`, `String`, `Convert`, `Environment`, `File`, `Path`, and `Thread`, and of every public type in a project's referenced assemblies and NuGet packages, appear in the palette under `.NET <Type>`; signatures graphs cannot express are filtered out (D-021).
 
-Remaining: classes, structs, properties; dictionaries, nested and user-defined generic types; typed catch clauses and rethrow; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
+Next: classes, structs, and properties.
+
+Remaining: classes, structs, properties; dictionaries, nested and user-defined generic types; constructors, properties, and generic methods of .NET types; typed catch clauses and rethrow; async/await.
 
 ## Phase 4 — Code quality and IDE integration
 

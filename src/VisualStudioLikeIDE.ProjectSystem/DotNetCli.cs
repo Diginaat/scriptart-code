@@ -13,9 +13,16 @@ public static class DotNetCli
     private static readonly string[] InheritedMsBuildVariables =
         ["MSBuildExtensionsPath", "MSBUILD_EXE_PATH", "MSBuildSDKsPath", "MSBuildLoadMicrosoftTargetsReadOnly"];
 
-    public static async Task<int> BuildAsync(string csprojPath, string configuration, Action<string> output, CancellationToken cancellationToken)
+    public static Task<int> BuildAsync(string csprojPath, string configuration, Action<string> output, CancellationToken cancellationToken) =>
+        RunToEndAsync(["build", csprojPath, "--nologo", "-c", configuration], output, cancellationToken);
+
+    /// <summary>Restores the project's NuGet packages, which records their assemblies in <c>obj/project.assets.json</c>.</summary>
+    public static Task<int> RestoreAsync(string csprojPath, Action<string> output, CancellationToken cancellationToken) =>
+        RunToEndAsync(["restore", csprojPath], output, cancellationToken);
+
+    private static async Task<int> RunToEndAsync(string[] arguments, Action<string> output, CancellationToken cancellationToken)
     {
-        using DotNetProcess process = DotNetProcess.Start(["build", csprojPath, "--nologo", "-c", configuration], output);
+        using DotNetProcess process = DotNetProcess.Start(arguments, output);
         try
         {
             return await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);

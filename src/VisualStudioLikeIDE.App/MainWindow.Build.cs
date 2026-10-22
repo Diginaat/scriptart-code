@@ -76,6 +76,15 @@ public sealed partial class MainWindow
                 line => Dispatcher.UIThread.Post(() => AppendOutput(line)), buildCancellation.Token);
             bool succeeded = exitCode == 0;
             SetStatus(succeeded ? "Build succeeded." : $"Build failed (exit code {exitCode}). See Output.");
+
+            // The build restores packages, which can make new .NET methods available as nodes.
+            if (workspace.LoadNewReferences())
+            {
+                paletteVariables = "";
+                RefreshPaletteForVariables();
+                Recompile();
+                AppendOutput("Added nodes for the methods of newly referenced assemblies (palette category .NET).");
+            }
             return succeeded;
         }
         catch (OperationCanceledException)

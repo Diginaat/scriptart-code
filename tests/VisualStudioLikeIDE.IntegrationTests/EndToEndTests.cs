@@ -1,7 +1,10 @@
 using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using VisualStudioLikeIDE.Compiler;
 using VisualStudioLikeIDE.Compiler.Emit;
 using VisualStudioLikeIDE.Compiler.Nodes;
+using VisualStudioLikeIDE.GraphModel;
 using VisualStudioLikeIDE.ProjectSystem;
 
 namespace VisualStudioLikeIDE.IntegrationTests;
@@ -85,6 +88,48 @@ public sealed class EndToEndTests
         Assert.Equal("Enter numbers separated by commas:\nCount: 3\nSum: 12\n", await GenerateBuildAndRun(project, "3,4,5"));
     }
 
+    [Fact]
+    public async Task MethodsOfAReferencedAssemblyAreCalledFromTheGraph()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = VisualProject.Create(directory.Path, "WithLibrary");
+        string library = Path.Combine(directory.Path, "lib", "Greetings.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(library)!);
+        CSharpCompilation compilation = CSharpCompilation.Create("Greetings",
+            [CSharpSyntaxTree.ParseText("namespace Greetings; public static class Greeter { public static string Greet(string name) => \"Hi \" + name; }",
+                cancellationToken: TestContext.Current.CancellationToken)],
+            [MetadataReference.CreateFromFile(ReferencePackAssembly("System.Runtime.dll"))],
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        Assert.True(compilation.Emit(library, cancellationToken: TestContext.Current.CancellationToken).Success);
+        await File.WriteAllTextAsync(project.CsprojPath, VisualProject.CsprojTemplate(project.Document).Replace("</Project>",
+            "  <ItemGroup>\n    <Reference Include=\"Greetings\"><HintPath>lib\\Greetings.dll</HintPath></Reference>\n  </ItemGroup>\n\n</Project>",
+            StringComparison.Ordinal), TestContext.Current.CancellationToken);
+        PrintResultOfCall(project, "M:Greetings.Greeter.Greet(System.String)", "name", "Ada");
+
+        var compiler = new GraphCompiler(NodeLibrary.CreateDefault(project.References.AssemblyPaths));
+
+        Assert.Equal("Hi Ada\n", await GenerateBuildAndRun(project, input: null, compiler));
+    }
+
+    [Fact]
+    public async Task MethodsOfANuGetPackageAreCalledAfterRestore()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = VisualProject.Create(directory.Path, "WithPackage");
+        await File.WriteAllTextAsync(project.CsprojPath, VisualProject.CsprojTemplate(project.Document).Replace("</Project>",
+            "  <ItemGroup>\n    <PackageReference Include=\"Humanizer.Core\" Version=\"2.14.1\" />\n  </ItemGroup>\n\n</Project>",
+            StringComparison.Ordinal), TestContext.Current.CancellationToken);
+        Assert.True(project.References.PackagesNotRestored);
+        var log = new StringBuilder();
+        int restore = await DotNetCli.RestoreAsync(project.CsprojPath, line => { lock (log) { log.AppendLine(line); } }, TestContext.Current.CancellationToken);
+        Assert.SkipWhen(restore != 0, $"NuGet restore failed, probably because there is no network access:\n{log}");
+        PrintResultOfCall(project, "M:Humanizer.StringHumanizeExtensions.Humanize(System.String)", "input", "some_text_here");
+
+        var compiler = new GraphCompiler(NodeLibrary.CreateDefault(project.References.AssemblyPaths));
+
+        Assert.Equal("some text here\n", await GenerateBuildAndRun(project, input: null, compiler));
+    }
+
     [Theory]
     [InlineData("HelloWorld")]
     [InlineData("ConsoleApplication")]
@@ -121,9 +166,54 @@ public sealed class EndToEndTests
         Assert.True(File.Exists(Path.Combine(directory.Path, "Helpers.cs")));
     }
 
-    private static async Task<string> GenerateBuildAndRun(VisualProject project, string? input)
+    /// <summary>
+    /// Replaces the project's entry graph with Entry, then a call to the .NET method <paramref name="documentationId"/> with the
+    /// string <paramref name="argument"/>, then Print Line of its result.
+    /// </summary>
+    private static void PrintResultOfCall(VisualProject project, string documentationId, string parameter, string argument)
     {
-        ProjectGenerationResult generation = project.Generate(Compiler);
+        GraphDocument graph = project.Graphs[0].Graph;
+        graph.Nodes.Clear();
+        graph.Connections.Clear();
+        GraphNode Add(string type, SortedDictionary<string, string>? properties = null)
+        {
+            var node = new GraphNode { Id = GraphDocument.NewId(), Type = type, Properties = properties ?? new(StringComparer.Ordinal) };
+            graph.Nodes.Add(node);
+            return node;
+        }
+
+        GraphNode entry = Add(BuiltInNodes.EntryTypeId);
+        GraphNode call = Add(ExternalApi.TypeIdPrefix + documentationId);
+        GraphNode text = Add("literal.string", new(StringComparer.Ordinal) { ["value"] = argument });
+        GraphNode print = Add("console.write-line");
+        graph.Connections.AddRange([
+            new(new PinRef(entry.Id, "then"), new PinRef(call.Id, "exec")),
+            new(new PinRef(text.Id, "value"), new PinRef(call.Id, parameter)),
+            new(new PinRef(call.Id, "then"), new PinRef(print.Id, "exec")),
+            new(new PinRef(call.Id, "result"), new PinRef(print.Id, "text")),
+        ]);
+    }
+
+    /// <summary>
+    /// An assembly of the installed net10.0 reference pack. A library compiled against the runtime's implementation assemblies
+    /// would reference System.Private.CoreLib, which a project build cannot resolve.
+    /// </summary>
+    private static string ReferencePackAssembly(string fileName)
+    {
+        // The runtime lives in <dotnet>/shared/Microsoft.NETCore.App/<version>/; reference packs in <dotnet>/packs/.
+        string dotnet = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "..", "..", ".."));
+        string pack = Directory.GetDirectories(Path.Combine(dotnet, "packs", "Microsoft.NETCore.App.Ref"))
+            .Where(directory => File.Exists(Path.Combine(directory, "ref", "net10.0", fileName)))
+            .Order(StringComparer.Ordinal)
+            .Last();
+        return Path.Combine(pack, "ref", "net10.0", fileName);
+    }
+
+    private static Task<string> GenerateBuildAndRun(VisualProject project, string? input) => GenerateBuildAndRun(project, input, Compiler);
+
+    private static async Task<string> GenerateBuildAndRun(VisualProject project, string? input, GraphCompiler compiler)
+    {
+        ProjectGenerationResult generation = project.Generate(compiler);
         Assert.True(generation.Success, string.Join("\n", generation.Diagnostics));
 
         var buildLog = new StringBuilder();

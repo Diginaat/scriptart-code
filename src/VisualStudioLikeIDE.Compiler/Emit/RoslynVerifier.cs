@@ -18,13 +18,19 @@ public sealed record VerificationSource(string Path, string Text, GeneratedSourc
 /// </summary>
 /// <remarks>
 /// References come from the running .NET runtime, which matches the generated projects' target framework (net10.0).
-/// This is a fast pre-check, not a replacement for <c>dotnet build</c>: package and project references are not resolved here.
+/// This is a fast pre-check, not a replacement for <c>dotnet build</c>: package assemblies are passed in by the caller once restored,
+/// and project references are not resolved.
 /// </remarks>
 public static class RoslynVerifier
 {
-    private static readonly Lazy<MetadataReference[]> RuntimeReferences = new(LoadRuntimeReferences);
+    private static readonly Lazy<MetadataReference[]> RuntimeReferenceList = new(LoadRuntimeReferences);
 
-    public static IReadOnlyList<GraphDiagnostic> Verify(string assemblyName, IReadOnlyList<VerificationSource> sources, bool isExecutable)
+    /// <summary>The framework assemblies of the running runtime.</summary>
+    internal static IReadOnlyList<MetadataReference> RuntimeReferences => RuntimeReferenceList.Value;
+
+    /// <param name="referencePaths">Assemblies the project references besides the framework, such as NuGet package assemblies.</param>
+    public static IReadOnlyList<GraphDiagnostic> Verify(string assemblyName, IReadOnlyList<VerificationSource> sources, bool isExecutable,
+        IReadOnlyList<string>? referencePaths = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         var parseOptions = new CSharpParseOptions(LanguageVersion.Latest);
@@ -33,7 +39,7 @@ public static class RoslynVerifier
         var compilation = CSharpCompilation.Create(
             assemblyName,
             trees,
-            RuntimeReferences.Value,
+            [.. RuntimeReferences, .. (referencePaths ?? []).Select(path => MetadataReference.CreateFromFile(path))],
             new CSharpCompilationOptions(
                 isExecutable ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));

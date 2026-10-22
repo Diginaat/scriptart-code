@@ -29,7 +29,7 @@ public sealed class MaxNode() : PureNodeDefinition(
 
 Run in execution order. Emit statements with `context.Emit`, expose values with `context.DeclareOutput` (which creates a local only when the output is connected), and lower nested execution outputs with `context.LowerBranch`. Do not lower the node's own continuation: the compiler continues at the point where the node's outgoing paths rejoin.
 
-A loop node declares its body output with `PinDefinition.LoopBody()` and lowers it with `context.LowerLoopBody`, passing any data outputs that only exist inside the body (create their locals with `context.NewLocal`). For Each nodes (`CollectionNodes`) are loop nodes too. Other nested blocks use `PinDefinition.Block(id, name)` and `context.LowerBlock(id, kind, values)`, as the Try node does.
+A loop node declares its body output with `PinDefinition.LoopBody()` and lowers it with `context.LowerLoopBody`, passing any data outputs that only exist inside the body (create their locals with `context.NewLocal`). Nodes for .NET methods are not written by hand: `ExternalApi` builds them from assembly metadata (`ExternalMethodNode`, `ExternalPureMethodNode`), and `NodeLibrary.CreateDefault(referencePaths)` registers them. For Each nodes (`CollectionNodes`) are loop nodes too. Other nested blocks use `PinDefinition.Block(id, name)` and `context.LowerBlock(id, kind, values)`, as the Try node does.
 
 See `ConsoleReadLineNode`, `BranchNode`, and `ForLoopNode` in `src/VisualStudioLikeIDE.Compiler/Nodes/BuiltInNodes.cs`.
 

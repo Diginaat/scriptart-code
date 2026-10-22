@@ -17,6 +17,9 @@ internal sealed class Workspace
     // Adding a function changes the project file, which no graph editor's undo history covers.
     private bool projectChanged;
 
+    // Referenced assemblies whose methods are in the node library.
+    private readonly HashSet<string> loadedReferences = new(StringComparer.OrdinalIgnoreCase);
+
     private Workspace(VisualProject project, GraphCompiler compiler)
     {
         Project = project;
@@ -51,7 +54,27 @@ internal sealed class Workspace
             throw new InvalidOperationException($"Project '{project.Name}' contains no graphs.");
         }
 
-        return new Workspace(project, new GraphCompiler(NodeLibrary.CreateDefault()));
+        IReadOnlyList<string> references = project.References.AssemblyPaths;
+        var workspace = new Workspace(project, new GraphCompiler(NodeLibrary.CreateDefault(references)));
+        workspace.loadedReferences.UnionWith(references);
+        return workspace;
+    }
+
+    /// <summary>
+    /// Adds the methods of assemblies the project started referencing since they were last loaded, for example after a build
+    /// restored a new package. Returns true when nodes were added. Removed references keep their nodes until the project is reopened.
+    /// </summary>
+    public bool LoadNewReferences()
+    {
+        string[] added = [.. Project.References.AssemblyPaths.Where(path => !loadedReferences.Contains(path))];
+        if (added.Length == 0)
+        {
+            return false;
+        }
+
+        Compiler.Library.RegisterExternalMethods(ExternalApi.FromAssemblies(added));
+        loadedReferences.UnionWith(added);
+        return true;
     }
 
     /// <summary>Makes <paramref name="graph"/> the graph being edited and compiles it.</summary>

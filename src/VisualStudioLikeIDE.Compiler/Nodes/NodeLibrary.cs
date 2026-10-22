@@ -99,8 +99,11 @@ public sealed class NodeLibrary
                 : new VariableGetNode(key.Id, key.Name, key.Type))
             : null;
 
-    /// <summary>Creates a library containing every built-in node.</summary>
-    public static NodeLibrary CreateDefault()
+    /// <summary>
+    /// Creates a library containing every built-in node, a node per callable method of <see cref="ExternalApi.FrameworkTypes"/>,
+    /// and a node per callable method of the assemblies at <paramref name="referencePaths"/>, such as a project's packages.
+    /// </summary>
+    public static NodeLibrary CreateDefault(IReadOnlyList<string>? referencePaths = null)
     {
         var library = new NodeLibrary();
         foreach (NodeDefinition definition in BuiltInNodes.All())
@@ -108,6 +111,24 @@ public sealed class NodeLibrary
             library.Register(definition);
         }
 
+        library.RegisterExternalMethods(ExternalApi.Framework);
+        library.RegisterExternalMethods(ExternalApi.FromAssemblies(referencePaths ?? []));
         return library;
+    }
+
+    /// <summary>
+    /// Adds a node per method, for example after a restore made a package's assemblies known. Methods already registered are
+    /// skipped, so a package that forwards a type to the framework adds nothing twice.
+    /// </summary>
+    public void RegisterExternalMethods(IEnumerable<ExternalMethod> methods)
+    {
+        ArgumentNullException.ThrowIfNull(methods);
+        foreach (ExternalMethod method in methods)
+        {
+            if (Find(method.TypeId) is null)
+            {
+                Register(ExternalApi.CreateNode(method));
+            }
+        }
     }
 }
