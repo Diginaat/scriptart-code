@@ -62,7 +62,7 @@ internal sealed class MethodLowerer
         // Parameter names come first: they are part of the method's signature and must not be renamed.
         foreach (GraphParameter parameter in index.Graph.Parameters)
         {
-            if (TypeSystem.TypeRef.FromKeyword(parameter.Type) is { } type)
+            if (TypeSystem.TypeRef.FromName(parameter.Type) is { } type)
             {
                 lowerer.parameters.Add(parameter.Id, new IrLocal(lowerer.AllocateName(parameter.Name), type));
             }
@@ -78,7 +78,7 @@ internal sealed class MethodLowerer
     /// <summary>The parameters of the method in declaration order, as generated.</summary>
     internal static IReadOnlyList<IrParameter> Parameters(GraphDocument graph) =>
         [.. graph.Parameters
-            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromKeyword(parameter.Type)))
+            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromName(parameter.Type)))
             .Where(parameter => parameter.Type is not null)
             .Select(parameter => new IrParameter(parameter.Name, parameter.Type!))];
 
@@ -106,7 +106,7 @@ internal sealed class MethodLowerer
         foreach (GraphVariable variable in index.Graph.Variables)
         {
             ResolvedNode? firstWriter = writers.FirstOrDefault(node => ((VariableSetNode)node.Definition).VariableId == variable.Id);
-            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromKeyword(variable.Type) is not { } type)
+            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromName(variable.Type) is not { } type)
             {
                 continue;
             }
@@ -121,7 +121,7 @@ internal sealed class MethodLowerer
             variables.Add(variable.Id, local);
 
             // An invalid initial value was reported while validating the graph's variables.
-            IrExpression initial = LiteralValues.TryParse(type, variable.Value, out object? value, out _) ? new IrLiteral(value, type) : new IrError(type);
+            IrExpression initial = LiteralValues.TryInitialValue(type, variable.Value, out _) ?? new IrError(type);
             declarations.Add(new IrLocalDeclaration(local, initial));
         }
 

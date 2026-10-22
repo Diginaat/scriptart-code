@@ -76,6 +76,15 @@ public sealed class EndToEndTests
         Assert.Equal($"Enter a number:\n{result}Done.\n", await GenerateBuildAndRun(project, input));
     }
 
+    [Fact]
+    public async Task CollectionsSampleParsesAListAndSumsIt()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Collections", directory.Path);
+
+        Assert.Equal("Enter numbers separated by commas:\nCount: 3\nSum: 12\n", await GenerateBuildAndRun(project, "3,4,5"));
+    }
+
     [Theory]
     [InlineData("HelloWorld")]
     [InlineData("ConsoleApplication")]
@@ -83,6 +92,7 @@ public sealed class EndToEndTests
     [InlineData("Loops")]
     [InlineData("Functions")]
     [InlineData("Exceptions")]
+    [InlineData("Collections")]
     public void CheckedInSampleCodeMatchesGenerator(string sample)
     {
         // The samples directory holds the generated code so samples build without the IDE. It must stay current.

@@ -40,6 +40,10 @@ public static class IrSimplifier
             {
                 SimplifyLoopBody(forBody);
             }
+            else if (statements[i] is IrForEach { Body: var forEachBody })
+            {
+                SimplifyLoopBody(forEachBody);
+            }
             else if (statements[i] is IrTry attempt)
             {
                 SimplifyBlock(attempt.Try);
@@ -98,7 +102,7 @@ public static class IrSimplifier
     private static bool HasSideEffects(IrExpression expression) => expression switch
     {
         // A property getter is code that may have side effects.
-        IrStaticCall or IrInstanceCall or IrCall or IrMemberAccess or IrError => true,
+        IrStaticCall or IrInstanceCall or IrCall or IrMemberAccess or IrObjectCreation or IrElementAccess or IrError => true,
 
         // Integer division and remainder throw DivideByZeroException.
         IrBinary { Operator: IrBinaryOperator.Divide or IrBinaryOperator.Remainder } => true,

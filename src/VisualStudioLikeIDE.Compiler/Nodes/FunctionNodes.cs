@@ -34,11 +34,11 @@ public sealed record FunctionSignature(string GraphId, string Name, IReadOnlyLis
     public static FunctionSignature? Of(GraphDocument graph)
     {
         ArgumentNullException.ThrowIfNull(graph);
-        TypeRef? returnType = graph.ReturnType is null ? TypeRef.Void : TypeRef.FromKeyword(graph.ReturnType);
+        TypeRef? returnType = graph.ReturnType is null ? TypeRef.Void : TypeRef.FromName(graph.ReturnType);
         List<(string, string, TypeRef)> parameters = [];
         foreach (GraphParameter parameter in graph.Parameters)
         {
-            if (TypeRef.FromKeyword(parameter.Type) is not { } type)
+            if (TypeRef.FromName(parameter.Type) is not { } type)
             {
                 return null;
             }

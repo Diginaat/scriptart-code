@@ -51,6 +51,12 @@ public sealed record IrCall(string MethodName, IReadOnlyList<IrExpression> Argum
 public sealed record IrInstanceCall(IrExpression Receiver, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type)
     : IrExpression(Type);
 
+/// <summary>Creates an object: <c>new List&lt;int&gt;()</c>.</summary>
+public sealed record IrObjectCreation(TypeRef Type, IReadOnlyList<IrExpression> Arguments) : IrExpression(Type);
+
+/// <summary>Reads an element of a list: <c>list[index]</c>.</summary>
+public sealed record IrElementAccess(IrExpression Receiver, IrExpression Index, TypeRef Type) : IrExpression(Type);
+
 /// <summary>Reads a property or field of a value, for example <c>exception.Message</c>.</summary>
 public sealed record IrMemberAccess(IrExpression Receiver, string MemberName, TypeRef Type) : IrExpression(Type);
 

@@ -10,7 +10,7 @@ public sealed partial class GraphEditor
     /// <summary>Adds a variable of the given type (a C# keyword such as <c>int</c>) with a unique name and the type's default value.</summary>
     public GraphVariable AddVariable(string type)
     {
-        TypeRef typeRef = TypeRef.FromKeyword(type) ?? throw new ArgumentException($"Unsupported variable type '{type}'.", nameof(type));
+        TypeRef typeRef = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported variable type '{type}'.", nameof(type));
         string name = "variable";
         for (int suffix = 2; Graph.Variables.Exists(variable => variable.Name == name); suffix++)
         {
@@ -52,14 +52,14 @@ public sealed partial class GraphEditor
     public void SetVariableType(string variableId, string type)
     {
         GraphVariable variable = FindVariable(variableId);
-        TypeRef typeRef = TypeRef.FromKeyword(type) ?? throw new ArgumentException($"Unsupported variable type '{type}'.", nameof(type));
+        TypeRef typeRef = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported variable type '{type}'.", nameof(type));
         (string oldType, string oldValue) = (variable.Type, variable.Value);
         if (oldType == type)
         {
             return;
         }
 
-        string newValue = LiteralValues.TryParse(typeRef, variable.Value, out _, out _) ? variable.Value : DefaultValue(typeRef);
+        string newValue = LiteralValues.TryInitialValue(typeRef, variable.Value, out _) is not null ? variable.Value : DefaultValue(typeRef);
         ExecuteDroppingInvalidWires(
             "Change variable type",
             () => (variable.Type, variable.Value) = (type, newValue),
@@ -132,5 +132,5 @@ public sealed partial class GraphEditor
         Graph.FindVariable(variableId) ?? throw new ArgumentException($"Unknown variable '{variableId}'.", nameof(variableId));
 
     private static string DefaultValue(TypeRef type) =>
-        type == TypeRef.Boolean ? "false" : type == TypeRef.String ? "" : "0";
+        type == TypeRef.Boolean ? "false" : type == TypeRef.String || type.IsList ? "" : "0";
 }

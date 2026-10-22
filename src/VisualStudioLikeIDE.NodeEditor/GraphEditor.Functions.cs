@@ -23,7 +23,7 @@ public sealed partial class GraphEditor
     /// <summary>Adds a parameter of the given type (a C# keyword such as <c>int</c>) with a unique name.</summary>
     public GraphParameter AddParameter(string type)
     {
-        _ = TypeRef.FromKeyword(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
+        _ = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
         string name = "value";
         for (int suffix = 2; Graph.Parameters.Exists(parameter => parameter.Name == name) || Graph.Variables.Exists(variable => variable.Name == name); suffix++)
         {
@@ -49,7 +49,7 @@ public sealed partial class GraphEditor
 
     public void SetParameterType(string parameterId, string type)
     {
-        _ = TypeRef.FromKeyword(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
+        _ = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
         GraphParameter parameter = FindParameter(parameterId);
         string old = parameter.Type;
         if (old != type)
@@ -73,7 +73,7 @@ public sealed partial class GraphEditor
     /// <summary>Sets the return type: a C# keyword such as <c>int</c>, or null for a function that returns nothing.</summary>
     public void SetReturnType(string? type)
     {
-        if (type is not null && TypeRef.FromKeyword(type) is null)
+        if (type is not null && TypeRef.FromName(type) is null)
         {
             throw new ArgumentException($"Unsupported return type '{type}'.", nameof(type));
         }

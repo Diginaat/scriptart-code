@@ -26,9 +26,11 @@ Done: shared-subexpression hoisting. A value one statement uses more than once i
 
 Done: exceptions. The Try node runs its Try block, a Catch block with the error's Message, and a Finally block; Throw Error stops with a message (D-019). See the `Exceptions` sample.
 
-Next: `foreach` over collections, which needs collection types first.
+Done: lists and `foreach`. Variables, parameters, and return values can be `List<T>` of the four simple types. Lists nodes create, add, set, get, remove, clear, count, and search; For Each loops over a list; Split Text and Join Text convert between text and lists (D-020). See the `Collections` sample.
 
-Remaining: `foreach` over collections; classes, structs, properties; collections and generics; typed catch clauses and rethrow; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
+Next: calling external .NET APIs.
+
+Remaining: classes, structs, properties; dictionaries, nested and user-defined generic types; typed catch clauses and rethrow; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
 
 ## Phase 4 — Code quality and IDE integration
 
@@ -44,7 +46,7 @@ Installer, crash recovery and autosave, accessibility review, preferences, upgra
 
 ## Known limitations of the current build
 
-- Function graphs cannot be deleted or renamed on disk from the IDE yet; the file keeps its first name. Variables, parameters, and return types are limited to `bool`, `int`, `double`, and `string`. Variables are method-wide.
+- Function graphs cannot be deleted or renamed on disk from the IDE yet; the file keeps its first name. Variables, parameters, and return types are limited to `bool`, `int`, `double`, `string`, and lists of them. Variables are method-wide.
 - Reroute points stay in place when the nodes they connect, or a comment around them, are moved.
 - Running programs receive input from the Output panel's input box; there is no interactive terminal.
 - The `.csproj` is created once; build settings are edited there directly.

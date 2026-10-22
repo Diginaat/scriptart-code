@@ -42,8 +42,8 @@ Both formats are UTF-8 JSON without a BOM, indented with two spaces, with `\n` l
 | `connections[]` | Directed from an output pin to an input pin. A connection is identified by its two pins. |
 | `connections[].points` | Optional reroute points the wire passes through, in order from the output (added in version 3). Layout only; omitted for direct wires. |
 | `comments[]` | Titled boxes drawn behind nodes (added in version 2). `x`, `y`, `width`, `height` in canvas units; `text` is the title. Comments never affect generated code. Membership is not stored: a node belongs to a comment while it lies completely inside it, so moving nodes in or out needs no bookkeeping. |
-| `variables[]` | Local variables of the graph's method (added in version 4). `name` is the C# local name; `type` is `bool`, `int`, `double`, or `string`; `value` is the initial value as invariant-culture text. |
-| `parameters[]` | Parameters of a `Function` graph, in order (added in version 5). `id` is stable and doubles as the pin id; `name` is the C# parameter name; `type` is `bool`, `int`, `double`, or `string`. |
+| `variables[]` | Local variables of the graph's method (added in version 4). `name` is the C# local name; `type` is `bool`, `int`, `double`, `string`, or a list of one of them (`List<int>`); `value` is the initial value as invariant-culture text, and must be blank for a list, which starts empty. |
+| `parameters[]` | Parameters of a `Function` graph, in order (added in version 5). `id` is stable and doubles as the pin id; `name` is the C# parameter name; `type` is any variable type, including list types. |
 | `returnType` | C# keyword of a function's return type. Omitted for a function that returns nothing. |
 
 Variable nodes use the types `variable.get` and `variable.set`, with the property `variable` holding the variable's `id`. Their title and pin types come from the variable, so renaming or retyping a variable updates every node that uses it.

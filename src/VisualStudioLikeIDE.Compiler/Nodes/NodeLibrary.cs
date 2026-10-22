@@ -93,7 +93,7 @@ public sealed class NodeLibrary
         });
 
     private NodeDefinition? VariableDefinition(GraphVariable variable, bool set) =>
-        TypeRef.FromKeyword(variable.Type) is { } type
+        TypeRef.FromName(variable.Type) is { } type
             ? variableDefinitions.GetOrAdd((variable.Id, variable.Name, type, set), key => key.Set
                 ? new VariableSetNode(key.Id, key.Name, key.Type)
                 : new VariableGetNode(key.Id, key.Name, key.Type))

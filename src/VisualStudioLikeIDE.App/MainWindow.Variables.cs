@@ -73,9 +73,9 @@ public partial class MainWindow
         var name = new TextBox { Text = variable.Name, MinWidth = 0 };
         var type = new ComboBox
         {
-            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.Keyword).ToList(),
+            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.DisplayName).ToList(),
             SelectedItem = variable.Type,
-            Width = 86,
+            Width = 116,
             Margin = new Avalonia.Thickness(4, 0),
         };
         var delete = new Button { Content = "✕", Padding = new Avalonia.Thickness(8, 4) };
@@ -95,7 +95,7 @@ public partial class MainWindow
             : workspace!.Editor.Graph.Variables.Exists(other => other.Id != id && other.Name == text) ? $"Another variable is named '{text}'."
             : null;
         string? ValueProblem(string text) =>
-            TypeRef.FromKeyword(variable.Type) is { } typeRef && !LiteralValues.TryParse(typeRef, text, out _, out string? problem) ? problem : null;
+            TypeRef.FromName(variable.Type) is { } typeRef && LiteralValues.TryInitialValue(typeRef, text, out string? problem) is null ? problem : null;
         void Validate() => error.Text = NameProblem(name.Text ?? "") ?? ValueProblem(value.Text ?? "") ?? "";
 
         // Invalid names and values are still stored, like node values; the compiler reports them until they are fixed.

@@ -75,8 +75,8 @@ public sealed class GraphCompiler(NodeLibrary library)
         {
             string? problem = !IsValidIdentifier(variable.Name) ? $"Variable '{variable.Name}' does not have a valid C# name."
                 : !names.Add(variable.Name) ? $"More than one variable is named '{variable.Name}'."
-                : TypeRef.FromKeyword(variable.Type) is not { } type ? $"Variable '{variable.Name}' has the unsupported type '{variable.Type}'."
-                : !LiteralValues.TryParse(type, variable.Value, out _, out string? error) ? $"Variable '{variable.Name}': initial value: {error}"
+                : TypeRef.FromName(variable.Type) is not { } type ? $"Variable '{variable.Name}' has the unsupported type '{variable.Type}'."
+                : LiteralValues.TryInitialValue(type, variable.Value, out string? error) is null ? $"Variable '{variable.Name}': initial value: {error}"
                 : null;
             if (problem is not null)
             {
@@ -102,7 +102,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             Problem($"More than one function is named '{graph.Name}'.");
         }
 
-        if (graph.ReturnType is not null && TypeRef.FromKeyword(graph.ReturnType) is null)
+        if (graph.ReturnType is not null && TypeRef.FromName(graph.ReturnType) is null)
         {
             Problem($"Function '{graph.Name}' has the unsupported return type '{graph.ReturnType}'.");
         }
@@ -114,7 +114,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             string? problem = !IsValidIdentifier(parameter.Name) ? $"Parameter '{parameter.Name}' does not have a valid C# name."
                 : !parameterNames.Add(parameter.Name) ? $"More than one parameter is named '{parameter.Name}'."
                 : variableNames.Contains(parameter.Name) ? $"Parameter '{parameter.Name}' has the same name as a variable."
-                : TypeRef.FromKeyword(parameter.Type) is null ? $"Parameter '{parameter.Name}' has the unsupported type '{parameter.Type}'."
+                : TypeRef.FromName(parameter.Type) is null ? $"Parameter '{parameter.Name}' has the unsupported type '{parameter.Type}'."
                 : null;
             if (problem is not null)
             {
@@ -179,7 +179,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             return null;
         }
 
-        TypeRef returnType = isFunction ? TypeRef.FromKeyword(graph.ReturnType) ?? TypeRef.Void : TypeRef.Void;
+        TypeRef returnType = isFunction ? TypeRef.FromName(graph.ReturnType) ?? TypeRef.Void : TypeRef.Void;
         IrBlock? body = MethodLowerer.LowerBody(index, entries[0], diagnostics, returnType);
         if (body is null)
         {

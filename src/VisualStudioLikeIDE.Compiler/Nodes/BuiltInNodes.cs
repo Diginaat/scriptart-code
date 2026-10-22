@@ -55,6 +55,11 @@ public static class BuiltInNodes
         yield return new ToStringNode("convert.bool-to-string", "Boolean to String", TypeRef.Boolean);
         yield return new ParseNode("convert.string-to-int", "Parse Integer", TypeRef.Int32);
         yield return new ParseNode("convert.string-to-double", "Parse Number", TypeRef.Double);
+
+        foreach (NodeDefinition node in CollectionNodes.All())
+        {
+            yield return node;
+        }
     }
 
     private static IEnumerable<NodeDefinition> ArithmeticNodes(TypeRef type, string suffix, string label)

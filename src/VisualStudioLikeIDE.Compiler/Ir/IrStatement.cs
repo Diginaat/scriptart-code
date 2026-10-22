@@ -27,6 +27,12 @@ public sealed record IrWhile(IrExpression Condition, IrBlock Body) : IrStatement
 /// <summary><c>for (int index = start; index &lt; end; index++) { body }</c>. <paramref name="End"/> is evaluated before every iteration.</summary>
 public sealed record IrFor(IrLocal Index, IrExpression Start, IrExpression End, IrBlock Body) : IrStatement;
 
+/// <summary><c>foreach (T item in collection) { body }</c>.</summary>
+public sealed record IrForEach(IrLocal Item, IrExpression Collection, IrBlock Body) : IrStatement;
+
+/// <summary>Replaces an element of a list: <c>list[index] = value;</c>.</summary>
+public sealed record IrElementAssignment(IrExpression Receiver, IrExpression Index, IrExpression Value) : IrStatement;
+
 public sealed record IrBreak : IrStatement;
 
 public sealed record IrContinue : IrStatement;

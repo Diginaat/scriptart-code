@@ -51,10 +51,10 @@ internal static class CSharpEmitter
         "#nullable enable" + EndOfLineText + EndOfLineText);
 
     private static MethodDeclarationSyntax EmitMethod(IrMethod method, SortedSet<string> usings) =>
-        MethodDeclaration(TypeSyntaxFor(method.ReturnType), method.Name)
+        MethodDeclaration(TypeSyntaxFor(method.ReturnType, usings), method.Name)
             .AddModifiers(Token(method.IsPrivate ? SyntaxKind.PrivateKeyword : SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
             .AddParameterListParameters([.. method.Parameters.Select(parameter =>
-                Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type)))])
+                Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings)))])
             .WithBody(EmitBlock(method.Body, usings));
 
     private static BlockSyntax EmitBlock(IrBlock block, SortedSet<string> usings) =>
@@ -66,7 +66,7 @@ internal static class CSharpEmitter
         {
             IrExpressionStatement expression => ExpressionStatement(EmitExpression(expression.Expression, usings)),
             IrLocalDeclaration declaration => LocalDeclarationStatement(VariableDeclaration(
-                declaration.Local.Type.Keyword is null ? IdentifierName("var") : TypeSyntaxFor(declaration.Local.Type),
+                declaration.Local.Type.Keyword is null ? IdentifierName("var") : TypeSyntaxFor(declaration.Local.Type, usings),
                 [VariableDeclarator(declaration.Local.Name).WithInitializer(EqualsValueClause(EmitExpression(declaration.Initializer, usings)))])),
             IrAssignment assignment => ExpressionStatement(AssignmentExpression(
                 SyntaxKind.SimpleAssignmentExpression, IdentifierName(assignment.Local.Name), EmitExpression(assignment.Value, usings))),
@@ -76,9 +76,12 @@ internal static class CSharpEmitter
             IrFor loop => EmitFor(loop, usings),
             IrBreak => BreakStatement(),
             IrContinue => ContinueStatement(),
-            IrThrow thrown => ThrowStatement(ObjectCreationExpression(TypeExpression(TypeRef.InvalidOperationException, usings))
+            IrThrow thrown => ThrowStatement(ObjectCreationExpression(TypeSyntaxFor(TypeRef.InvalidOperationException, usings))
                 .WithArgumentList(Arguments([thrown.Message], usings))),
             IrTry attempt => EmitTry(attempt, usings),
+            IrForEach loop => ForEachStatement(TypeSyntaxFor(loop.Item.Type, usings), loop.Item.Name, EmitExpression(loop.Collection, usings), EmitBlock(loop.Body, usings)),
+            IrElementAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
+                EmitElementAccess(assignment.Receiver, assignment.Index, usings), EmitExpression(assignment.Value, usings))),
             _ => throw new NotSupportedException($"Unsupported IR statement {statement.GetType().Name}."),
         };
 
@@ -92,15 +95,19 @@ internal static class CSharpEmitter
         // The condition goes through the binary-expression emitter so the end value gets parentheses only when it needs them.
         var condition = new IrBinary(IrBinaryOperator.LessThan, new IrLocalReference(loop.Index), loop.End, TypeRef.Boolean);
         return ForStatement(EmitBlock(loop.Body, usings))
-            .WithDeclaration(VariableDeclaration(TypeSyntaxFor(loop.Index.Type),
+            .WithDeclaration(VariableDeclaration(TypeSyntaxFor(loop.Index.Type, usings),
                 [VariableDeclarator(loop.Index.Name).WithInitializer(EqualsValueClause(EmitExpression(loop.Start, usings)))]))
             .WithCondition(EmitExpression(condition, usings))
             .WithIncrementors([PostfixUnaryExpression(SyntaxKind.PostIncrementExpression, IdentifierName(loop.Index.Name))]);
     }
 
+    private static ElementAccessExpressionSyntax EmitElementAccess(IrExpression receiver, IrExpression index, SortedSet<string> usings) =>
+        ElementAccessExpression(Operand(receiver, Precedence.Primary, usings))
+            .WithArgumentList(BracketedArgumentList([Argument(EmitExpression(index, usings))]));
+
     private static TryStatementSyntax EmitTry(IrTry attempt, SortedSet<string> usings)
     {
-        CatchDeclarationSyntax declaration = CatchDeclaration(TypeExpression(TypeRef.Exception, usings));
+        CatchDeclarationSyntax declaration = CatchDeclaration(TypeSyntaxFor(TypeRef.Exception, usings));
         if (attempt.Exception is { } exception)
         {
             declaration = declaration.WithIdentifier(Identifier(exception.Name));
@@ -135,12 +142,14 @@ internal static class CSharpEmitter
             Operand(unary.Operand, Precedence.Unary, usings, avoidUnaryMinus: unary.Operator == IrUnaryOperator.Negate)),
         IrConvert convert => EmitConvert(convert, usings),
         IrStaticCall call => InvocationExpression(
-            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, TypeExpression(call.DeclaringType, usings), IdentifierName(call.MethodName)),
+            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, TypeSyntaxFor(call.DeclaringType, usings), IdentifierName(call.MethodName)),
             Arguments(call.Arguments, usings)),
         IrCall call => InvocationExpression(IdentifierName(call.MethodName), Arguments(call.Arguments, usings)),
         IrInstanceCall call => InvocationExpression(
             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(call.Receiver, Precedence.Primary, usings), IdentifierName(call.MethodName)),
             Arguments(call.Arguments, usings)),
+        IrObjectCreation creation => ObjectCreationExpression(TypeSyntaxFor(creation.Type, usings)).WithArgumentList(Arguments(creation.Arguments, usings)),
+        IrElementAccess element => EmitElementAccess(element.Receiver, element.Index, usings),
         IrMemberAccess access => MemberAccessExpression(
             SyntaxKind.SimpleMemberAccessExpression, Operand(access.Receiver, Precedence.Primary, usings), IdentifierName(access.MemberName)),
         IrError => throw new InvalidOperationException("IR containing errors must not be emitted."),
@@ -154,7 +163,7 @@ internal static class CSharpEmitter
             return EmitLiteral((double)integer);
         }
 
-        return CastExpression(TypeSyntaxFor(convert.Type), Operand(convert.Operand, Precedence.Unary, usings, avoidUnaryMinus: false));
+        return CastExpression(TypeSyntaxFor(convert.Type, usings), Operand(convert.Operand, Precedence.Unary, usings, avoidUnaryMinus: false));
     }
 
     private static ArgumentListSyntax Arguments(IReadOnlyList<IrExpression> arguments, SortedSet<string> usings) =>
@@ -238,24 +247,22 @@ internal static class CSharpEmitter
         return text.Contains('.', StringComparison.Ordinal) || text.Contains('E', StringComparison.Ordinal) ? text : text + ".0";
     }
 
-    private static TypeSyntax TypeSyntaxFor(TypeRef type) => type.Keyword switch
+    /// <summary>The C# syntax for <paramref name="type"/>, adding the <c>using</c> directives it needs to <paramref name="usings"/>.</summary>
+    private static TypeSyntax TypeSyntaxFor(TypeRef type, SortedSet<string> usings)
     {
-        "void" => PredefinedType(Token(SyntaxKind.VoidKeyword)),
-        "bool" => PredefinedType(Token(SyntaxKind.BoolKeyword)),
-        "int" => PredefinedType(Token(SyntaxKind.IntKeyword)),
-        "double" => PredefinedType(Token(SyntaxKind.DoubleKeyword)),
-        "string" => PredefinedType(Token(SyntaxKind.StringKeyword)),
-        _ => IdentifierName(type.Name),
-    };
-
-    private static TypeSyntax TypeExpression(TypeRef type, SortedSet<string> usings)
-    {
-        if (type.Keyword is null)
+        switch (type.Keyword)
         {
-            usings.Add(type.Namespace);
+            case "void": return PredefinedType(Token(SyntaxKind.VoidKeyword));
+            case "bool": return PredefinedType(Token(SyntaxKind.BoolKeyword));
+            case "int": return PredefinedType(Token(SyntaxKind.IntKeyword));
+            case "double": return PredefinedType(Token(SyntaxKind.DoubleKeyword));
+            case "string": return PredefinedType(Token(SyntaxKind.StringKeyword));
         }
 
-        return TypeSyntaxFor(type);
+        usings.Add(type.Namespace);
+        return type.ElementType is { } element
+            ? GenericName(Identifier(type.Name), TypeArgumentList([TypeSyntaxFor(element, usings)]))
+            : IdentifierName(type.Name);
     }
 
     private static List<SourceMapEntry> BuildSourceMap(SyntaxTree tree)

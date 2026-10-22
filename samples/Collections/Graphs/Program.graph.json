@@ -1,0 +1,508 @@
+{
+  "schemaVersion": 5,
+  "id": "collections-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "prompt",
+      "type": "console.write-line",
+      "x": 220,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "prompt-text",
+      "type": "literal.string",
+      "x": 0,
+      "y": 100,
+      "properties": {
+        "value": "Enter numbers separated by commas:"
+      }
+    },
+    {
+      "id": "read",
+      "type": "console.read-line",
+      "x": 460,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "split",
+      "type": "string.split",
+      "x": 460,
+      "y": 140,
+      "properties": {}
+    },
+    {
+      "id": "comma",
+      "type": "literal.string",
+      "x": 240,
+      "y": 220,
+      "properties": {
+        "value": ","
+      }
+    },
+    {
+      "id": "each-part",
+      "type": "flow.foreach.string",
+      "x": 700,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "parse",
+      "type": "convert.string-to-int",
+      "x": 940,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "add",
+      "type": "list.int.add",
+      "x": 1180,
+      "y": -40,
+      "properties": {}
+    },
+    {
+      "id": "numbers-for-add",
+      "type": "variable.get",
+      "x": 940,
+      "y": 60,
+      "properties": {
+        "variable": "numbers"
+      }
+    },
+    {
+      "id": "each-number",
+      "type": "flow.foreach.int",
+      "x": 1180,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "numbers-for-sum",
+      "type": "variable.get",
+      "x": 940,
+      "y": 320,
+      "properties": {
+        "variable": "numbers"
+      }
+    },
+    {
+      "id": "accumulate",
+      "type": "variable.set",
+      "x": 1420,
+      "y": 240,
+      "properties": {
+        "variable": "sum"
+      }
+    },
+    {
+      "id": "sum-before",
+      "type": "variable.get",
+      "x": 1180,
+      "y": 420,
+      "properties": {
+        "variable": "sum"
+      }
+    },
+    {
+      "id": "plus",
+      "type": "math.int.add",
+      "x": 1420,
+      "y": 420,
+      "properties": {}
+    },
+    {
+      "id": "print-count",
+      "type": "console.write-line",
+      "x": 1660,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "count",
+      "type": "list.int.count",
+      "x": 1180,
+      "y": 560,
+      "properties": {}
+    },
+    {
+      "id": "numbers-for-count",
+      "type": "variable.get",
+      "x": 940,
+      "y": 560,
+      "properties": {
+        "variable": "numbers"
+      }
+    },
+    {
+      "id": "count-text",
+      "type": "convert.int-to-string",
+      "x": 1420,
+      "y": 560,
+      "properties": {}
+    },
+    {
+      "id": "count-label",
+      "type": "literal.string",
+      "x": 1420,
+      "y": 660,
+      "properties": {
+        "value": "Count: "
+      }
+    },
+    {
+      "id": "count-line",
+      "type": "string.concat",
+      "x": 1660,
+      "y": 560,
+      "properties": {}
+    },
+    {
+      "id": "print-sum",
+      "type": "console.write-line",
+      "x": 1900,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "sum-after",
+      "type": "variable.get",
+      "x": 1660,
+      "y": 700,
+      "properties": {
+        "variable": "sum"
+      }
+    },
+    {
+      "id": "sum-text",
+      "type": "convert.int-to-string",
+      "x": 1900,
+      "y": 700,
+      "properties": {}
+    },
+    {
+      "id": "sum-label",
+      "type": "literal.string",
+      "x": 1900,
+      "y": 800,
+      "properties": {
+        "value": "Sum: "
+      }
+    },
+    {
+      "id": "sum-line",
+      "type": "string.concat",
+      "x": 2140,
+      "y": 700,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt-text",
+        "pin": "value"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt",
+        "pin": "then"
+      },
+      "to": {
+        "node": "read",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "then"
+      },
+      "to": {
+        "node": "each-part",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "line"
+      },
+      "to": {
+        "node": "split",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "comma",
+        "pin": "value"
+      },
+      "to": {
+        "node": "split",
+        "pin": "separator"
+      }
+    },
+    {
+      "from": {
+        "node": "split",
+        "pin": "parts"
+      },
+      "to": {
+        "node": "each-part",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "each-part",
+        "pin": "body"
+      },
+      "to": {
+        "node": "add",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "each-part",
+        "pin": "item"
+      },
+      "to": {
+        "node": "parse",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "numbers-for-add",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "parse",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "item"
+      }
+    },
+    {
+      "from": {
+        "node": "each-part",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "each-number",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "numbers-for-sum",
+        "pin": "value"
+      },
+      "to": {
+        "node": "each-number",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "each-number",
+        "pin": "body"
+      },
+      "to": {
+        "node": "accumulate",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "sum-before",
+        "pin": "value"
+      },
+      "to": {
+        "node": "plus",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "each-number",
+        "pin": "item"
+      },
+      "to": {
+        "node": "plus",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "plus",
+        "pin": "result"
+      },
+      "to": {
+        "node": "accumulate",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "each-number",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "print-count",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "numbers-for-count",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "count",
+        "pin": "count"
+      },
+      "to": {
+        "node": "count-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "count-label",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count-line",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "count-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "count-line",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "count-line",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print-count",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "print-count",
+        "pin": "then"
+      },
+      "to": {
+        "node": "print-sum",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "sum-after",
+        "pin": "value"
+      },
+      "to": {
+        "node": "sum-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "sum-label",
+        "pin": "value"
+      },
+      "to": {
+        "node": "sum-line",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "sum-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "sum-line",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "sum-line",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print-sum",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [
+    {
+      "id": "numbers",
+      "name": "numbers",
+      "type": "List<int>",
+      "value": ""
+    },
+    {
+      "id": "sum",
+      "name": "sum",
+      "type": "int",
+      "value": "0"
+    }
+  ],
+  "parameters": []
+}

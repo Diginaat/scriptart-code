@@ -103,7 +103,7 @@ public partial class MainWindow
 
         var returnType = new ComboBox
         {
-            ItemsSource = new[] { NoReturnValue }.Concat(TypeRef.VariableTypes.Select(type => type.Keyword)).ToList(),
+            ItemsSource = new[] { NoReturnValue }.Concat(TypeRef.VariableTypes.Select(type => type.DisplayName)).ToList(),
             SelectedItem = graph.ReturnType ?? NoReturnValue,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
         };
@@ -150,9 +150,9 @@ public partial class MainWindow
         var name = new TextBox { Text = parameter.Name, MinWidth = 0 };
         var type = new ComboBox
         {
-            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.Keyword).ToList(),
+            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.DisplayName).ToList(),
             SelectedItem = parameter.Type,
-            Width = 86,
+            Width = 116,
             Margin = new Avalonia.Thickness(4, 0),
         };
         var delete = new Button { Content = "✕", Padding = new Avalonia.Thickness(8, 4) };

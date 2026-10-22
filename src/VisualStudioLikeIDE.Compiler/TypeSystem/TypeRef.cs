@@ -4,9 +4,10 @@ namespace VisualStudioLikeIDE.Compiler.TypeSystem;
 /// A reference to a .NET type used by pins and the intermediate representation.
 /// </summary>
 /// <param name="Namespace">Containing namespace, used to generate <c>using</c> directives.</param>
-/// <param name="Name">Metadata name, for example <c>Int32</c>.</param>
+/// <param name="Name">Metadata name without generic arity, for example <c>Int32</c> or <c>List</c>.</param>
 /// <param name="Keyword">C# keyword alias, for example <c>int</c>, when one exists.</param>
-public sealed record TypeRef(string Namespace, string Name, string? Keyword = null)
+/// <param name="ElementType">The type argument of a generic collection such as <c>List&lt;int&gt;</c>.</param>
+public sealed record TypeRef(string Namespace, string Name, string? Keyword = null, TypeRef? ElementType = null)
 {
     public static readonly TypeRef Void = new("System", "Void", "void");
     public static readonly TypeRef Boolean = new("System", "Boolean", "bool");
@@ -17,14 +18,22 @@ public sealed record TypeRef(string Namespace, string Name, string? Keyword = nu
     public static readonly TypeRef Exception = new("System", "Exception");
     public static readonly TypeRef InvalidOperationException = new("System", "InvalidOperationException");
 
-    /// <summary>The types a graph variable can have, in the order the editor offers them.</summary>
-    public static IReadOnlyList<TypeRef> VariableTypes { get; } = [Boolean, Int32, Double, String];
+    /// <summary>The types a list can hold, which are also the simple types of variables, parameters, and return values.</summary>
+    public static IReadOnlyList<TypeRef> ElementTypes { get; } = [Boolean, Int32, Double, String];
 
-    /// <summary>The variable type with this C# keyword, or null.</summary>
-    public static TypeRef? FromKeyword(string? keyword) => VariableTypes.FirstOrDefault(type => type.Keyword == keyword);
+    /// <summary>The types a graph variable, parameter, or return value can have, in the order the editor offers them.</summary>
+    public static IReadOnlyList<TypeRef> VariableTypes { get; } = [.. ElementTypes, .. ElementTypes.Select(ListOf)];
+
+    /// <summary><c>List&lt;T&gt;</c> of <paramref name="element"/>.</summary>
+    public static TypeRef ListOf(TypeRef element) => new("System.Collections.Generic", "List", ElementType: element);
+
+    /// <summary>The variable type with this C# name, such as <c>int</c> or <c>List&lt;int&gt;</c>, or null.</summary>
+    public static TypeRef? FromName(string? name) => VariableTypes.FirstOrDefault(type => type.DisplayName == name);
+
+    public bool IsList => Namespace == "System.Collections.Generic" && Name == "List" && ElementType is not null;
 
     /// <summary>The name shown in the editor and used in generated code.</summary>
-    public string DisplayName => Keyword ?? Name;
+    public string DisplayName => Keyword ?? (ElementType is null ? Name : $"{Name}<{ElementType.DisplayName}>");
 
     public override string ToString() => DisplayName;
 }

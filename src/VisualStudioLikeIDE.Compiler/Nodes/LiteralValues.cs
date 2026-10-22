@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using VisualStudioLikeIDE.Compiler.Ir;
 using VisualStudioLikeIDE.Compiler.TypeSystem;
 
 namespace VisualStudioLikeIDE.Compiler.Nodes;
@@ -10,6 +11,23 @@ namespace VisualStudioLikeIDE.Compiler.Nodes;
 /// </summary>
 public static class LiteralValues
 {
+    /// <summary>
+    /// The value a variable of <paramref name="type"/> starts with, given its initial value text: a literal, or a new empty list
+    /// for a list type, whose text must be blank. Null with an <paramref name="error"/> when the text does not fit the type.
+    /// </summary>
+    public static IrExpression? TryInitialValue(TypeRef type, string text, out string? error)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(text);
+        if (type.IsList)
+        {
+            error = string.IsNullOrWhiteSpace(text) ? null : "A list always starts empty. Leave the initial value blank and add items with Add to List.";
+            return error is null ? new IrObjectCreation(type, []) : null;
+        }
+
+        return TryParse(type, text, out object? value, out error) ? new IrLiteral(value, type) : null;
+    }
+
     public static bool TryParse(TypeRef type, string text, [NotNullWhen(true)] out object? value, out string? error)
     {
         ArgumentNullException.ThrowIfNull(type);

@@ -92,7 +92,7 @@ src/
   VisualStudioLikeIDE.App            Avalonia desktop IDE
   VisualStudioLikeIDE.Cli            headless generate/build/run
 tests/                               unit, integration (real dotnet builds), performance harness
-samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions
+samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections
 docs/                                architecture, compiler pipeline, formats, decisions, roadmap
 ```
 
