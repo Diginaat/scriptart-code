@@ -11,14 +11,30 @@ public sealed class NodeLibrary
 {
     private readonly Dictionary<string, NodeDefinition> definitions = new(StringComparer.Ordinal);
 
+    // Generic .NET methods, whose nodes are built per node from the type arguments it stores.
+    private readonly Dictionary<string, ExternalMethod> genericMethods = new(StringComparer.Ordinal);
+
+    // .NET types graphs can hold values of, by SourceName.
+    private readonly Dictionary<string, ExternalType> externalTypes = new(StringComparer.Ordinal);
+
     // Variable nodes get their pins from the variable they refer to. Definitions are immutable, so one is shared per variable state.
     private readonly ConcurrentDictionary<(string Id, string Name, TypeRef Type, bool Set), NodeDefinition> variableDefinitions = new();
 
-    // Function entry, return, and call nodes get their pins from a function's signature, and type nodes from a class or struct;
-    // keyed by node type and everything the pins depend on.
+    // Function entry, return, and call nodes get their pins from a function's signature, type nodes from a class or struct, and
+    // generated collection nodes from a list or dictionary type; keyed by node type and everything the pins depend on.
     private readonly ConcurrentDictionary<string, NodeDefinition> generatedDefinitions = new(StringComparer.Ordinal);
 
     public IEnumerable<NodeDefinition> Definitions => definitions.Values;
+
+    /// <summary>The .NET types graphs can hold values of, such as <c>System.Text.StringBuilder</c>, in name order.</summary>
+    public IEnumerable<ExternalType> ExternalTypes => externalTypes.Values.OrderBy(type => type.Type.SourceName, StringComparer.Ordinal);
+
+    /// <summary>The .NET type <paramref name="type"/> refers to, or null when no referenced assembly offers it.</summary>
+    public ExternalType? FindExternalType(TypeRef type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return externalTypes.GetValueOrDefault(type.SourceName);
+    }
 
     public void Register(NodeDefinition definition)
     {
@@ -31,12 +47,17 @@ public sealed class NodeLibrary
 
     public NodeDefinition? Find(string typeId) => definitions.GetValueOrDefault(typeId);
 
+    /// <summary>True when <paramref name="typeId"/> is a generic .NET method, whose node needs type arguments.</summary>
+    public bool IsGenericMethod(string typeId) => genericMethods.ContainsKey(typeId);
+
     /// <summary>
     /// The definition of a node placed in <paramref name="graph"/>. Most nodes are found by type. Variable nodes are built from the
     /// variable named by their <see cref="VariableNodes.VariableProperty"/>, function nodes from a function's signature (the graph's
-    /// own for entry and return nodes, the called graph's for call nodes), and type nodes from a class or struct. Called functions
-    /// and types are found in <paramref name="projectGraphs"/>, the project's graphs. These are null when what they refer to is
-    /// missing, has an unsupported type, or does not fit the graph.
+    /// own for entry and return nodes, the called graph's for call nodes), type nodes from a class or struct, the generated nodes of
+    /// collections from the type in <see cref="CollectionNodes.CollectionProperty"/>, and generic .NET methods from their type
+    /// arguments. Nodes of a generic class or struct, and calls of its methods, take its type arguments from
+    /// <see cref="TypeNodes.TypeArgumentsProperty"/>. Called functions and types are found in <paramref name="projectGraphs"/>, the
+    /// project's graphs. These are null when what they refer to is missing, has an unsupported type, or does not fit the graph.
     /// </summary>
     public NodeDefinition? Resolve(GraphNode node, GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
@@ -47,7 +68,7 @@ public sealed class NodeLibrary
         {
             case VariableNodes.GetTypeId or VariableNodes.SetTypeId:
                 return node.Properties.TryGetValue(VariableNodes.VariableProperty, out string? variableId) && graph.FindVariable(variableId) is { } variable
-                    ? VariableDefinition(variable, node.Type == VariableNodes.SetTypeId, projectGraphs)
+                    ? VariableDefinition(variable, node.Type == VariableNodes.SetTypeId, graph, projectGraphs)
                     : null;
             case FunctionNodes.EntryTypeId:
                 return FunctionSignature.Of(graph, projectGraphs) is { } own ? FunctionDefinition(node.Type, own) : null;
@@ -56,24 +77,82 @@ public sealed class NodeLibrary
             case FunctionNodes.CallTypeId:
                 return node.Properties.TryGetValue(FunctionNodes.FunctionProperty, out string? functionId)
                     && projectGraphs.FirstOrDefault(function => function.Id == functionId) is { } called
-                    && FunctionSignature.Of(called, projectGraphs) is { } signature
-                    ? FunctionDefinition(node.Type, signature)
+                    && FunctionSignature.Of(called, projectGraphs) is { IsConstructor: false } signature
+                    && OwnerArguments(node, called, graph, projectGraphs) is { } callArguments
+                    && signature.Instantiate(callArguments) is { } instantiated
+                    ? FunctionDefinition(node.Type, instantiated)
                     : null;
+            case TypeNodes.SelfTypeId:
+                return FunctionSignature.Of(graph, projectGraphs) is { Owner: { } owner } ? SelfDefinition(owner) : null;
             case TypeNodes.CreateTypeId or TypeNodes.GetTypeId or TypeNodes.SetTypeId or TypeNodes.WithTypeId:
-                return node.Properties.TryGetValue(TypeNodes.TypeProperty, out string? typeId)
-                    && projectGraphs.FirstOrDefault(type => type.Id == typeId) is { } typeGraph
-                    && ProjectTypeDefinition.Of(typeGraph, projectGraphs) is { } definition
-                    ? TypeDefinition(node.Type, definition, node.Properties.GetValueOrDefault(TypeNodes.PropertyProperty))
+                return ResolveTypeNode(node, graph, projectGraphs);
+            case string collectionNode when CollectionNodes.IsGeneratedNode(collectionNode):
+                return TypeRef.FromName(node.Properties.GetValueOrDefault(CollectionNodes.CollectionProperty), projectGraphs, graph) is { } collection
+                    ? CollectionDefinitions(collection).FirstOrDefault(definition => definition.TypeId == collectionNode)
+                    : null;
+            case string generic when genericMethods.TryGetValue(generic, out ExternalMethod? method):
+                return TypeRef.ArgumentsFromNames(node.Properties.GetValueOrDefault(ExternalApi.TypeArgumentsProperty), projectGraphs, graph) is { } typeArguments
+                    && method.Instantiate(typeArguments) is { } instance
+                    ? generatedDefinitions.GetOrAdd(generic + "\n" + TypeRef.ArgumentNames(typeArguments), _ => ExternalApi.CreateNode(instance))
                     : null;
             default:
                 return Find(node.Type);
         }
     }
 
+    private NodeDefinition? ResolveTypeNode(GraphNode node, GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs)
+    {
+        if (!node.Properties.TryGetValue(TypeNodes.TypeProperty, out string? typeId)
+            || projectGraphs.FirstOrDefault(type => type.Id == typeId && TypeRef.IsTypeGraph(type)) is not { } typeGraph
+            || OwnerArguments(node, typeGraph, graph, projectGraphs) is not { } typeArguments
+            || ProjectTypeDefinition.Of(typeGraph, projectGraphs, typeArguments) is not { } definition)
+        {
+            return null;
+        }
+
+        if (node.Type != TypeNodes.CreateTypeId)
+        {
+            return TypeDefinition(node.Type, definition, node.Properties.GetValueOrDefault(TypeNodes.PropertyProperty), IsConstructorOf(graph, typeGraph));
+        }
+
+        if (!node.Properties.TryGetValue(TypeNodes.ConstructorProperty, out string? constructorId))
+        {
+            return CreateDefinition(definition, null);
+        }
+
+        return projectGraphs.FirstOrDefault(constructor => constructor.Id == constructorId && constructor.Kind == GraphKind.Constructor && constructor.Owner == typeGraph.Id) is { } constructorGraph
+            && FunctionSignature.Of(constructorGraph, projectGraphs)?.Instantiate(typeArguments) is { } signature
+            ? CreateDefinition(definition, signature)
+            : null;
+    }
+
+    /// <summary>
+    /// The type arguments a node gives the generic class or struct <paramref name="owner"/>, or of the owner of a method it calls:
+    /// none for a type that is not generic, null when they are missing or do not fit.
+    /// </summary>
+    private static IReadOnlyList<TypeRef>? OwnerArguments(GraphNode node, GraphDocument ownerOrMethod, GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs)
+    {
+        GraphDocument? owner = TypeRef.IsTypeGraph(ownerOrMethod) ? ownerOrMethod : projectGraphs.FirstOrDefault(type => type.Id == ownerOrMethod.Owner);
+        if (owner is null || owner.TypeParameters.Count == 0)
+        {
+            return [];
+        }
+
+        return TypeRef.ArgumentsFromNames(node.Properties.GetValueOrDefault(TypeNodes.TypeArgumentsProperty), projectGraphs, graph) is { } arguments
+            && arguments.Count == owner.TypeParameters.Count
+            ? arguments
+            : null;
+    }
+
+    private static bool IsConstructorOf(GraphDocument graph, GraphDocument type) => graph.Kind == GraphKind.Constructor && graph.Owner == type.Id;
+
     /// <summary>
     /// Every node that can be added to <paramref name="graph"/>: the registered nodes, a Get and a Set node per variable, the entry
-    /// and return nodes of a function graph, a call node per function in <paramref name="projectGraphs"/>, and per class or struct a
-    /// New node and nodes for its properties. A class or struct graph has no method, so nothing can be added to it.
+    /// and return nodes of a function graph (and Self in a method or constructor of a class or struct), a call node per function or
+    /// method in <paramref name="projectGraphs"/>, per class or struct a New node per constructor and nodes for its properties, and
+    /// the nodes of every collection that a variable, parameter, return value, or property of the project uses. A generic class or
+    /// struct offers its nodes for each type argument list the project uses, and for its own type parameters inside its methods. A
+    /// class or struct graph has no method, so nothing can be added to it.
     /// </summary>
     public IEnumerable<NodeDefinition> DefinitionsFor(GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
@@ -85,7 +164,7 @@ public sealed class NodeLibrary
         }
 
         IEnumerable<NodeDefinition?> graphNodes = graph.Variables.SelectMany(variable =>
-            new[] { VariableDefinition(variable, set: false, projectGraphs), VariableDefinition(variable, set: true, projectGraphs) });
+            new[] { VariableDefinition(variable, set: false, graph, projectGraphs), VariableDefinition(variable, set: true, graph, projectGraphs) });
         if (FunctionSignature.Of(graph, projectGraphs) is { } own)
         {
             graphNodes = graphNodes.Append(FunctionDefinition(FunctionNodes.EntryTypeId, own));
@@ -93,17 +172,94 @@ public sealed class NodeLibrary
             {
                 graphNodes = graphNodes.Append(FunctionDefinition(FunctionNodes.ReturnTypeId, own));
             }
+
+            if (own.Owner is { } owner)
+            {
+                graphNodes = graphNodes.Append(SelfDefinition(owner));
+            }
         }
 
-        IEnumerable<NodeDefinition?> calls = projectGraphs.Select(function => FunctionSignature.Of(function, projectGraphs)).OfType<FunctionSignature>()
+        TypeRef[] used = [.. UsedTypes(graph, projectGraphs)];
+
+        // The type arguments each class or struct is used with: none for one that is not generic.
+        IEnumerable<(GraphDocument Type, IReadOnlyList<TypeRef> Arguments)> instances = projectGraphs.Where(TypeRef.IsTypeGraph).SelectMany(type => type.TypeParameters.Count == 0
+            ? [(type, (IReadOnlyList<TypeRef>)[])]
+            : used.Where(candidate => candidate.IsProjectType && candidate.Name == type.Name && candidate.Arguments.Count == type.TypeParameters.Count)
+                .Select(candidate => (type, candidate.Arguments)));
+
+        List<NodeDefinition?> typeNodes = [];
+        foreach ((GraphDocument type, IReadOnlyList<TypeRef> arguments) in instances)
+        {
+            if (ProjectTypeDefinition.Of(type, projectGraphs, arguments) is not { } definition)
+            {
+                continue;
+            }
+
+            typeNodes.Add(CreateDefinition(definition, null));
+            typeNodes.AddRange(projectGraphs
+                .Where(constructor => constructor.Kind == GraphKind.Constructor && constructor.Owner == type.Id)
+                .Select(constructor => FunctionSignature.Of(constructor, projectGraphs)?.Instantiate(arguments))
+                .OfType<FunctionSignature>()
+                .Select(signature => CreateDefinition(definition, signature)));
+            foreach ((string propertyId, _, _) in definition.Properties)
+            {
+                typeNodes.Add(TypeDefinition(TypeNodes.GetTypeId, definition, propertyId, inConstructor: false));
+                typeNodes.Add(TypeDefinition(definition.IsStruct ? TypeNodes.WithTypeId : TypeNodes.SetTypeId, definition, propertyId, inConstructor: false));
+                if (definition.IsStruct && IsConstructorOf(graph, type))
+                {
+                    typeNodes.Add(TypeDefinition(TypeNodes.SetTypeId, definition, propertyId, inConstructor: true));
+                }
+            }
+
+            typeNodes.AddRange(projectGraphs
+                .Where(method => method.Kind == GraphKind.Function && method.Owner == type.Id)
+                .Select(method => FunctionSignature.Of(method, projectGraphs)?.Instantiate(arguments))
+                .OfType<FunctionSignature>()
+                .Select(signature => FunctionDefinition(FunctionNodes.CallTypeId, signature)));
+        }
+
+        IEnumerable<NodeDefinition?> functions = projectGraphs
+            .Where(function => function.Kind == GraphKind.Function && function.Owner is null)
+            .Select(function => FunctionSignature.Of(function, projectGraphs))
+            .OfType<FunctionSignature>()
             .Select(signature => FunctionDefinition(FunctionNodes.CallTypeId, signature));
-        IEnumerable<NodeDefinition?> types = projectGraphs.Select(type => ProjectTypeDefinition.Of(type, projectGraphs)).OfType<ProjectTypeDefinition>()
-            .SelectMany(type => type.Properties
-                .SelectMany(property => new[] { TypeNodes.GetTypeId, type.IsStruct ? TypeNodes.WithTypeId : TypeNodes.SetTypeId }
-                    .Select(typeId => TypeDefinition(typeId, type, property.Id)))
-                .Prepend(TypeDefinition(TypeNodes.CreateTypeId, type, null)));
-        return Definitions.Concat(graphNodes.Concat(calls).Concat(types).OfType<NodeDefinition>());
+        IEnumerable<NodeDefinition> generic = genericMethods.Values.Select(method => generatedDefinitions.GetOrAdd(
+            method.TypeId + "\n" + ExternalApi.DefaultTypeArguments(method),
+            _ => ExternalApi.CreateNode(method.Instantiate([.. method.TypeParameters.Select(_ => TypeRef.Int32)])!)));
+        return Definitions
+            .Concat(graphNodes.Concat(functions).Concat(typeNodes).OfType<NodeDefinition>())
+            .Concat(generic)
+            .Concat(used.SelectMany(CollectionDefinitions));
     }
+
+    /// <summary>
+    /// Every type, and type argument within one, that a variable, parameter, return value, or property of the project uses, each read
+    /// in its own graph; and inside a method or constructor of a generic type, that type with its own type parameters.
+    /// </summary>
+    private static IEnumerable<TypeRef> UsedTypes(GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs)
+    {
+        IEnumerable<TypeRef> declared = projectGraphs.Append(graph).Distinct()
+            .SelectMany(used => used.Variables.Select(variable => variable.Type)
+                .Concat(used.Parameters.Select(parameter => parameter.Type))
+                .Concat(used.Properties.Select(property => property.Type))
+                .Append(used.ReturnType)
+                .Select(name => TypeRef.FromName(name, projectGraphs, used)))
+            .OfType<TypeRef>();
+        if (FunctionSignature.Of(graph, projectGraphs)?.Owner is { } owner)
+        {
+            declared = declared.Append(owner);
+        }
+
+        return declared.SelectMany(type => type.SelfAndArguments()).Distinct();
+    }
+
+    private IEnumerable<NodeDefinition> CollectionDefinitions(TypeRef collection) =>
+        CollectionNodes.HasGeneratedNodes(collection)
+            ? CollectionNodes.For(collection).Select(definition => generatedDefinitions.GetOrAdd(definition.TypeId + "\n" + collection.SourceName, _ => definition))
+            : [];
+
+    private NodeDefinition SelfDefinition(TypeRef owner) =>
+        generatedDefinitions.GetOrAdd(TypeNodes.SelfTypeId + "\n" + owner.SourceName, _ => new SelfNode(owner));
 
     private NodeDefinition FunctionDefinition(string typeId, FunctionSignature signature) =>
         generatedDefinitions.GetOrAdd(typeId + "\n" + signature.Key, _ => typeId switch
@@ -113,19 +269,24 @@ public sealed class NodeLibrary
             _ => new FunctionCallNode(signature),
         });
 
-    /// <summary>
-    /// A type node of <paramref name="type"/>; property nodes also name the property. Null when the property is missing, and for Set
-    /// on a struct or With on a class: a struct property is changed by copying the value, a class property by assigning it.
-    /// </summary>
-    private NodeDefinition? TypeDefinition(string typeId, ProjectTypeDefinition type, string? propertyId)
-    {
-        if (typeId == TypeNodes.CreateTypeId)
+    /// <summary>The New node of <paramref name="type"/>, running <paramref name="constructor"/>, or <c>new T()</c> when it is null.</summary>
+    private NodeDefinition CreateDefinition(ProjectTypeDefinition type, FunctionSignature? constructor) =>
+        generatedDefinitions.GetOrAdd(TypeNodes.CreateTypeId + "\n" + type.Key + "\n" + constructor?.Key, _ => (type.IsStruct, constructor) switch
         {
-            return generatedDefinitions.GetOrAdd(typeId + "\n" + type.Key, _ => type.IsStruct ? new CreateStructNode(type) : new CreateObjectNode(type));
-        }
+            (true, _) => new CreateStructNode(type, constructor),
+            _ => new CreateObjectNode(type, constructor),
+        });
 
+    /// <summary>
+    /// A property node of <paramref name="type"/>. Null when the property is missing, for With on a class, and for Set on a struct
+    /// outside its constructors: a struct property is changed by copying the value, a class property by assigning it. In a
+    /// constructor of a struct, Set assigns a property of the value being created.
+    /// </summary>
+    private NodeDefinition? TypeDefinition(string typeId, ProjectTypeDefinition type, string? propertyId, bool inConstructor)
+    {
         int index = type.Properties.Select(candidate => candidate.Id).ToList().IndexOf(propertyId ?? "");
-        if (index < 0 || (typeId == TypeNodes.SetTypeId && type.IsStruct) || (typeId == TypeNodes.WithTypeId && !type.IsStruct))
+        bool onSelf = typeId == TypeNodes.SetTypeId && type.IsStruct;
+        if (index < 0 || (onSelf && !inConstructor) || (typeId == TypeNodes.WithTypeId && !type.IsStruct))
         {
             return null;
         }
@@ -134,21 +295,22 @@ public sealed class NodeLibrary
         return generatedDefinitions.GetOrAdd(typeId + "\n" + id + "\n" + type.Key, _ => typeId switch
         {
             TypeNodes.GetTypeId => new GetPropertyNode(type, id, name, propertyType),
-            TypeNodes.SetTypeId => new SetPropertyNode(type, id, name, propertyType),
+            TypeNodes.SetTypeId => new SetPropertyNode(type, id, name, propertyType, onSelf),
             _ => new WithPropertyNode(type, id, name, propertyType),
         });
     }
 
-    private NodeDefinition? VariableDefinition(GraphVariable variable, bool set, IReadOnlyList<GraphDocument> projectGraphs) =>
-        TypeRef.FromName(variable.Type, projectGraphs) is { } type
+    private NodeDefinition? VariableDefinition(GraphVariable variable, bool set, GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs) =>
+        TypeRef.FromName(variable.Type, projectGraphs, graph) is { } type
             ? variableDefinitions.GetOrAdd((variable.Id, variable.Name, type, set), key => key.Set
                 ? new VariableSetNode(key.Id, key.Name, key.Type)
                 : new VariableGetNode(key.Id, key.Name, key.Type))
             : null;
 
     /// <summary>
-    /// Creates a library containing every built-in node, a node per callable method of <see cref="ExternalApi.FrameworkTypes"/>,
-    /// and a node per callable method of the assemblies at <paramref name="referencePaths"/>, such as a project's packages.
+    /// Creates a library containing every built-in node, a node per usable member of <see cref="ExternalApi.FrameworkTypes"/> and
+    /// <see cref="ExternalApi.FrameworkValueTypes"/>, and a node per usable member of the assemblies at <paramref name="referencePaths"/>,
+    /// such as a project's packages.
     /// </summary>
     public static NodeLibrary CreateDefault(IReadOnlyList<string>? referencePaths = null)
     {
@@ -158,21 +320,30 @@ public sealed class NodeLibrary
             library.Register(definition);
         }
 
-        library.RegisterExternalMethods(ExternalApi.Framework);
-        library.RegisterExternalMethods(ExternalApi.FromAssemblies(referencePaths ?? []));
+        library.RegisterExternal(new ExternalApiContents(ExternalApi.Framework, ExternalApi.FrameworkTypesOfValues));
+        library.RegisterExternal(ExternalApi.FromAssemblies(referencePaths ?? []));
         return library;
     }
 
     /// <summary>
-    /// Adds a node per method, for example after a restore made a package's assemblies known. Methods already registered are
-    /// skipped, so a package that forwards a type to the framework adds nothing twice.
+    /// Adds a node per member and the types graphs can hold values of, for example after a restore made a package's assemblies known.
+    /// Members and types already known are skipped, so a package that forwards a type to the framework adds nothing twice.
     /// </summary>
-    public void RegisterExternalMethods(IEnumerable<ExternalMethod> methods)
+    public void RegisterExternal(ExternalApiContents contents)
     {
-        ArgumentNullException.ThrowIfNull(methods);
-        foreach (ExternalMethod method in methods)
+        ArgumentNullException.ThrowIfNull(contents);
+        foreach (ExternalType type in contents.Types)
         {
-            if (Find(method.TypeId) is null)
+            externalTypes.TryAdd(type.Type.SourceName, type);
+        }
+
+        foreach (ExternalMethod method in contents.Members)
+        {
+            if (method.IsGeneric)
+            {
+                genericMethods.TryAdd(method.TypeId, method);
+            }
+            else if (Find(method.TypeId) is null)
             {
                 Register(ExternalApi.CreateNode(method));
             }

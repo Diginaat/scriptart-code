@@ -6,6 +6,7 @@ using VisualStudioLikeIDE.App.Canvas;
 using VisualStudioLikeIDE.Compiler.Nodes;
 using VisualStudioLikeIDE.Compiler.TypeSystem;
 using VisualStudioLikeIDE.GraphModel;
+using VisualStudioLikeIDE.NodeEditor;
 
 namespace VisualStudioLikeIDE.App;
 
@@ -29,18 +30,9 @@ public sealed partial class MainWindow
         }
     }
 
-    private IEnumerable<NodeDefinition> MatchingDefinitions(string? search)
-    {
-        string filter = search?.Trim() ?? "";
-        // With a project open, the palette also lists a Get and a Set node for each of the graph's variables.
-        return (workspace?.Editor.AvailableDefinitions ?? paletteLibrary.Definitions)
-            .Where(definition => filter.Length == 0
-                || definition.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || definition.Category.Contains(filter, StringComparison.OrdinalIgnoreCase)
-                || definition.Description.Contains(filter, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(definition => definition.Category, StringComparer.Ordinal)
-            .ThenBy(definition => definition.DisplayName, StringComparer.Ordinal);
-    }
+    // With a project open, the palette also lists a Get and a Set node for each of the graph's variables. Best matches come first.
+    private IEnumerable<NodeDefinition> MatchingDefinitions(string? search) =>
+        NodeSearch.Filter(workspace?.Editor.AvailableDefinitions ?? paletteLibrary.Definitions, search);
 
     private static ListBoxItem CreateNodeItem(NodeDefinition definition)
     {
@@ -192,7 +184,8 @@ public sealed partial class MainWindow
         string filter = ActionSearch.Text?.Trim() ?? "";
         List<IGrouping<string, NodeDefinition>> categories = [.. MatchingDefinitions(filter).Where(offered.Contains).GroupBy(definition => definition.Category)];
 
-        // While searching, or when few nodes fit, every category is open so the matches show without extra clicks.
+        // While searching, categories follow their best match, and every category is open so the matches show without extra
+        // clicks; so are they when few nodes fit.
         bool expand = filter.Length > 0 || categories.Sum(category => category.Count()) <= 30;
         foreach (IGrouping<string, NodeDefinition> category in categories)
         {
@@ -212,6 +205,7 @@ public sealed partial class MainWindow
             ActionTree.Items.Add(header);
         }
 
+        ShowActionDescription(null);
         if (categories.Count == 0)
         {
             ActionTree.Items.Add(new TreeViewItem
@@ -226,6 +220,12 @@ public sealed partial class MainWindow
             });
         }
     }
+
+    // What the highlighted node does, or the best match while searching, so a beginner sees it before adding the node.
+    private void ShowActionDescription(TreeViewItem? item) =>
+        ActionDescription.Text = (item ?? FirstAction())?.Tag is NodeDefinition definition
+            ? $"{definition.DisplayName}: {definition.Description}"
+            : "Hover or highlight a node to see what it does. Enter adds the first match.";
 
     private TreeViewItem? FirstAction() =>
         ActionTree.Items.OfType<TreeViewItem>().SelectMany(category => category.Items.OfType<TreeViewItem>()).FirstOrDefault();

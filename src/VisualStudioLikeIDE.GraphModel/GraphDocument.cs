@@ -8,7 +8,10 @@ public enum GraphKind
     /// <summary>The application entry point (<c>Program.Main</c>).</summary>
     EntryPoint,
 
-    /// <summary>A method of the program class, with <see cref="GraphDocument.Parameters"/> and an optional return value.</summary>
+    /// <summary>
+    /// A method with <see cref="GraphDocument.Parameters"/> and an optional return value: of the program class, or of the class or
+    /// struct named by <see cref="GraphDocument.Owner"/>.
+    /// </summary>
     Function,
 
     /// <summary>A class with the <see cref="GraphDocument.Properties"/> of the graph. Objects of it are shared by reference.</summary>
@@ -16,6 +19,12 @@ public enum GraphKind
 
     /// <summary>A struct with the <see cref="GraphDocument.Properties"/> of the graph. Values of it are copied.</summary>
     Struct,
+
+    /// <summary>
+    /// A constructor of the class or struct named by <see cref="GraphDocument.Owner"/>, with <see cref="GraphDocument.Parameters"/>
+    /// and no return value. Its <see cref="GraphDocument.Name"/> only names the graph and its file.
+    /// </summary>
+    Constructor,
 }
 
 /// <summary>
@@ -25,9 +34,10 @@ public sealed class GraphDocument
 {
     /// <summary>
     /// Version 2 added <see cref="Comments"/>; version 3 added <see cref="GraphConnection.Points"/>; version 4 added <see cref="Variables"/>;
-    /// version 5 added <see cref="Parameters"/> and <see cref="ReturnType"/>; version 6 added <see cref="Properties"/>.
+    /// version 5 added <see cref="Parameters"/> and <see cref="ReturnType"/>; version 6 added <see cref="Properties"/>; version 7
+    /// added <see cref="Owner"/>; version 8 added <see cref="GraphKind.Constructor"/> graphs and <see cref="TypeParameters"/>.
     /// </summary>
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 8;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -55,8 +65,20 @@ public sealed class GraphDocument
     /// <summary>C# name of a function's return type, like <see cref="GraphVariable.Type"/>, or null when it returns nothing (<c>void</c>).</summary>
     public string? ReturnType { get; set; }
 
+    /// <summary>
+    /// For a <see cref="GraphKind.Function"/> graph that is a method of a class or struct, and for a <see cref="GraphKind.Constructor"/>
+    /// graph, the id of that type's graph; null for a function of the program class.
+    /// </summary>
+    public string? Owner { get; set; }
+
     /// <summary>Properties of a <see cref="GraphKind.Class"/> or <see cref="GraphKind.Struct"/> graph, in declaration order.</summary>
     public List<GraphProperty> Properties { get; init; } = [];
+
+    /// <summary>
+    /// Type parameter names of a generic <see cref="GraphKind.Class"/> or <see cref="GraphKind.Struct"/> graph, such as <c>T</c> in
+    /// <c>Box&lt;T&gt;</c>, in declaration order. Its properties and the variables and parameters of its methods can use them as types.
+    /// </summary>
+    public List<string> TypeParameters { get; init; } = [];
 
     public GraphNode? FindNode(string nodeId) => Nodes.Find(node => node.Id == nodeId);
 

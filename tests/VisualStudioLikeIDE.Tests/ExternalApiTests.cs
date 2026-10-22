@@ -22,12 +22,11 @@ public sealed class ExternalApiTests
         Assert.False(Framework("M:System.IO.File.WriteAllText(System.String,System.String)").IsPure);
         Assert.True(Framework("M:System.String.ToUpper").IsPure);
 
-        // Unsupported types (long, decimal, arrays, char), generic methods, and out parameters are not offered.
+        // Unsupported types (long, decimal, arrays, char) and out parameters are not offered.
         Assert.DoesNotContain(ExternalApi.Framework, method => method.DocumentationId == "M:System.Math.Max(System.Int64,System.Int64)");
         Assert.DoesNotContain(ExternalApi.Framework, method => method.DocumentationId.StartsWith("M:System.IO.File.ReadAllLines", StringComparison.Ordinal));
         Assert.DoesNotContain(ExternalApi.Framework, method => method.DocumentationId.Contains("System.Char", StringComparison.Ordinal));
         Assert.DoesNotContain(ExternalApi.Framework, method => method.DocumentationId.Contains('@', StringComparison.Ordinal));
-        Assert.DoesNotContain(ExternalApi.Framework, method => method.DocumentationId.Contains("``", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -77,7 +76,7 @@ public sealed class ExternalApiTests
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.True(library.Emit(path, cancellationToken: TestContext.Current.CancellationToken).Success);
 
-        IReadOnlyList<ExternalMethod> methods = ExternalApi.FromAssemblies([path]);
+        IReadOnlyList<ExternalMethod> methods = ExternalApi.FromAssemblies([path]).Members;
         Assert.Equal(["Greeter.Greet(string)", "Greeter.Log(string)"], methods.Select(method => method.DisplayName));
 
         var graph = new GraphBuilder();

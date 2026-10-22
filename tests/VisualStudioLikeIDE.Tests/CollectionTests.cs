@@ -106,7 +106,7 @@ public sealed class CollectionTests
 
         Assert.True(compiled.Success, string.Join("\n", compiled.Diagnostics));
         Assert.Contains("using System.Collections.Generic;", compiled.Source!.Text, StringComparison.Ordinal);
-        Assert.Contains("private static List<int> Evens(List<int> numbers)", compiled.Source.Text, StringComparison.Ordinal);
+        Assert.Contains("public static List<int> Evens(List<int> numbers)", compiled.Source.Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -126,6 +126,6 @@ public sealed class CollectionTests
     {
         Assert.Equal("List<double>", TypeRef.ListOf(TypeRef.Double).DisplayName);
         Assert.Equal(TypeRef.ListOf(TypeRef.Double), TypeRef.FromName("List<double>"));
-        Assert.Null(TypeRef.FromName("List<List<int>>"));
+        Assert.Equal(TypeRef.ListOf(TypeRef.ListOf(TypeRef.Int32)), TypeRef.FromName("List<List<int>>"));
     }
 }

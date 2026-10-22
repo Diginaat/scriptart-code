@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 7,
+  "id": "vector",
+  "name": "Vector",
+  "kind": "Struct",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "x",
+      "name": "X",
+      "type": "int",
+      "value": "3"
+    },
+    {
+      "id": "y",
+      "name": "Y",
+      "type": "int",
+      "value": "4"
+    }
+  ]
+}

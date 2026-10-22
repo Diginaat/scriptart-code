@@ -8,7 +8,7 @@ using VisualStudioLikeIDE.ProjectSystem;
 
 namespace VisualStudioLikeIDE.App;
 
-/// <summary>Adding function graphs, and the Function section of the Details panel.</summary>
+/// <summary>Adding function graphs, and the Function section of the Details panel, also used for methods and constructors.</summary>
 public partial class MainWindow
 {
     private const string NoReturnValue = "(none)";
@@ -33,13 +33,16 @@ public partial class MainWindow
 
     private void AddFunctionEditors()
     {
-        if (workspace is null || workspace.Editor.Graph.Kind != GraphKind.Function)
+        if (workspace is null || workspace.Editor.Graph.Kind is not (GraphKind.Function or GraphKind.Constructor))
         {
             return;
         }
 
         GraphDocument graph = workspace.Editor.Graph;
-        InspectorPanel.Children.Add(new TextBlock { Text = "FUNCTION", Classes = { "panelTitle" }, Margin = new Avalonia.Thickness(0, 14, 0, 4) });
+        string? owner = workspace.Project.GraphDocuments.FirstOrDefault(type => type.Id == workspace.Editor.Graph.Owner)?.Name;
+        bool isConstructor = graph.Kind == GraphKind.Constructor;
+        string title = owner is null ? "FUNCTION" : $"{(isConstructor ? "CONSTRUCTOR" : "METHOD")} OF {owner.ToUpperInvariant()}";
+        InspectorPanel.Children.Add(new TextBlock { Text = title, Classes = { "panelTitle" }, Margin = new Avalonia.Thickness(0, 14, 0, 4) });
 
         var name = new TextBox { Text = graph.Name };
         var nameError = new TextBlock { Foreground = (IBrush)this.FindResource("IdeError")!, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
@@ -74,8 +77,11 @@ public partial class MainWindow
                 workspace.Editor.SetReturnType(type);
             }
         };
-        InspectorPanel.Children.Add(new TextBlock { Text = "Returns", Classes = { "secondary" }, FontSize = 12, Margin = new Avalonia.Thickness(0, 4, 0, 0) });
-        InspectorPanel.Children.Add(returnType);
+        if (!isConstructor)
+        {
+            InspectorPanel.Children.Add(new TextBlock { Text = "Returns", Classes = { "secondary" }, FontSize = 12, Margin = new Avalonia.Thickness(0, 4, 0, 0) });
+            InspectorPanel.Children.Add(returnType);
+        }
 
         InspectorPanel.Children.Add(new TextBlock { Text = "Parameters", Classes = { "secondary" }, FontSize = 12, Margin = new Avalonia.Thickness(0, 4, 0, 0) });
         foreach (GraphParameter parameter in graph.Parameters)
@@ -93,7 +99,9 @@ public partial class MainWindow
         InspectorPanel.Children.Add(add);
         InspectorPanel.Children.Add(new TextBlock
         {
-            Text = graph.ReturnType is null
+            Text = isConstructor
+                ? $"Parameters are outputs of the Function Entry node and inputs of New {owner} when it uses this constructor. Set properties through Self."
+                : graph.ReturnType is null
                 ? "Parameters are outputs of the Function Entry node. Call the function from any graph with its Call node."
                 : "Parameters are outputs of the Function Entry node. Every path must end at a Return Value node.",
             TextWrapping = TextWrapping.Wrap,

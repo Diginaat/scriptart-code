@@ -98,6 +98,22 @@ internal sealed class GraphBuilder
         return node.Id;
     }
 
+    /// <summary>Adds a generated list or dictionary node (list.add, dictionary.set, …) for the collection type named <paramref name="collection"/>.</summary>
+    public string CollectionNode(string typeId, string collection)
+    {
+        var node = new GraphNode { Id = $"n{nextId++}", Type = typeId };
+        node.Properties["collection"] = collection;
+        graph.Nodes.Add(node);
+        return node.Id;
+    }
+
+    /// <summary>Sets a property of a node already added, such as a generic type's type arguments, and returns the node id.</summary>
+    public string With(string nodeId, string property, string value)
+    {
+        graph.FindNode(nodeId)!.Properties[property] = value;
+        return nodeId;
+    }
+
     /// <summary>Adds a Print Line node fed by a string literal and returns the print node id.</summary>
     public string PrintLiteral(string text)
     {

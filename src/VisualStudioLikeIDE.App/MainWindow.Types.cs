@@ -16,11 +16,14 @@ public partial class MainWindow
     private string? focusPropertyId;
 
     private static string TypeSignatureText(GraphDocument type) =>
-        string.Join(":", [type.Id, type.Name, type.Kind.ToString(), .. type.Properties.Select(property => $"{property.Id}/{property.Name}/{property.Type}")]);
+        string.Join(":", [type.Id, type.Name, type.Kind.ToString(), string.Join(",", type.TypeParameters), .. type.Properties.Select(property => $"{property.Id}/{property.Name}/{property.Type}")]);
 
-    /// <summary>The names offered for variable, parameter, return, and property types: the simple types, lists, and the project's classes and structs.</summary>
+    /// <summary>
+    /// The names offered for variable, parameter, return, and property types: the simple types, lists, the project's classes and
+    /// structs, and the type parameters of the open class or struct or of the one owning the open method or constructor.
+    /// </summary>
     private List<string> TypeNames() =>
-        [.. TypeRef.TypesOf(workspace?.Project.GraphDocuments ?? []).Select(type => type.DisplayName)];
+        [.. TypeRef.TypesOf(workspace?.Project.GraphDocuments ?? [], workspace?.Editor.Graph).Select(type => type.DisplayName)];
 
     private void OnAddClass(object? sender, RoutedEventArgs e) => AddType(GraphKind.Class);
 
@@ -45,7 +48,7 @@ public partial class MainWindow
         bool isType = workspace is not null && TypeRef.IsTypeGraph(workspace.Graph.Graph);
         TypeGraphHint.IsVisible = isType;
         TypeGraphHint.Text = isType
-            ? $"{workspace!.Graph.Graph.Name} is a {workspace.Graph.Graph.Kind.ToString().ToLowerInvariant()}: it has properties instead of nodes. Edit them in Details, and use its New, Get, and {(workspace.Graph.Graph.Kind == GraphKind.Struct ? "With" : "Set")} nodes from the Types category in the program and function graphs."
+            ? $"{workspace!.Graph.Graph.Name} is a {workspace.Graph.Graph.Kind.ToString().ToLowerInvariant()}: it has properties instead of nodes. Edit them in Details, and use its New, Get, and {(workspace.Graph.Graph.Kind == GraphKind.Struct ? "With" : "Set")} nodes from the Types category in the program and function graphs. Add Method and Add Constructor give it methods and constructors."
             : "";
     }
 
@@ -79,20 +82,52 @@ public partial class MainWindow
         InspectorPanel.Children.Add(name);
         InspectorPanel.Children.Add(nameError);
 
+        var typeParameters = new TextBox { Text = string.Join(", ", graph.TypeParameters), PlaceholderText = "none, or for example T" };
+        ToolTip.SetTip(typeParameters, $"Comma-separated type parameters, such as T, make {graph.Name} generic; use them as property, parameter, and return types");
+        void CommitTypeParameters()
+        {
+            string[] names = (typeParameters.Text ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (workspace?.Editor.Graph == graph && !names.SequenceEqual(graph.TypeParameters, StringComparer.Ordinal))
+            {
+                workspace.Editor.SetTypeParameters(names);
+            }
+        }
+
+        typeParameters.LostFocus += (_, _) => CommitTypeParameters();
+        typeParameters.KeyDown += (_, e) => CommitOnEnter(e, CommitTypeParameters);
+        InspectorPanel.Children.Add(new TextBlock { Text = "Type parameters", Classes = { "secondary" }, FontSize = 12, Margin = new Avalonia.Thickness(0, 4, 0, 0) });
+        InspectorPanel.Children.Add(typeParameters);
+
         InspectorPanel.Children.Add(new TextBlock { Text = "Properties", Classes = { "secondary" }, FontSize = 12, Margin = new Avalonia.Thickness(0, 4, 0, 0) });
         foreach (GraphProperty property in graph.Properties)
         {
             AddPropertyEditor(graph, property);
         }
 
-        var add = new Button { Content = "Add Property", Margin = new Avalonia.Thickness(0, 4, 0, 0) };
+        var add = new Button { Content = "Add Property", Margin = new Avalonia.Thickness(0, 4, 6, 0) };
         add.Click += (_, _) =>
         {
             GraphProperty property = workspace.Editor.AddProperty("int");
             focusPropertyId = property.Id;
             ShowInspector();
         };
-        InspectorPanel.Children.Add(add);
+        var addMethod = new Button { Content = "Add Method", Margin = new Avalonia.Thickness(0, 4, 6, 0) };
+        ToolTip.SetTip(addMethod, $"Add a method graph to {graph.Name}; call it with its Call node and use Self inside it");
+        addMethod.Click += (_, _) =>
+        {
+            ProjectGraph method = workspace.AddMethod(workspace.Graph);
+            ShowOpenGraph();
+            SetStatus($"Added method {method.Graph.Name} to {graph.Name}. Rename it and add parameters in Details; Self is the {graph.Name} it runs on.");
+        };
+        var addConstructor = new Button { Content = "Add Constructor", Margin = new Avalonia.Thickness(0, 4, 6, 0) };
+        ToolTip.SetTip(addConstructor, $"Add a constructor graph to {graph.Name}; choose it on a New node and set properties through Self inside it");
+        addConstructor.Click += (_, _) =>
+        {
+            ProjectGraph constructor = workspace.AddConstructor(workspace.Graph);
+            ShowOpenGraph();
+            SetStatus($"Added constructor {constructor.Graph.Name} to {graph.Name}. Add parameters in Details; New {graph.Name} nodes offer it.");
+        };
+        InspectorPanel.Children.Add(new WrapPanel { Children = { add, addMethod, addConstructor } });
         InspectorPanel.Children.Add(new TextBlock
         {
             Text = isStruct

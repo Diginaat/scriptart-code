@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 7,
+  "id": "counter",
+  "name": "Counter",
+  "kind": "Class",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "count",
+      "name": "Count",
+      "type": "int",
+      "value": "0"
+    }
+  ]
+}

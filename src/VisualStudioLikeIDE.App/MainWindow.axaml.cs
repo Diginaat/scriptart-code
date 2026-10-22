@@ -112,6 +112,7 @@ public sealed partial class MainWindow : Window
         }, RoutingStrategies.Tunnel);
         GraphCanvas.ValueEditRequested += (_, e) => BeginValueEdit(e);
         GraphCanvas.CommentEditRequested += (_, e) => BeginCommentEdit(e);
+        GraphCanvas.NodeActivated += (_, nodeId) => ActivateNode(nodeId);
         InlineEditor.TextChanged += (_, _) => ValidateInlineEdit();
         InlineEditor.LostFocus += (_, _) => EndInlineEdit(commit: true);
         // Tunnel: a multi-line TextBox consumes Enter itself before bubbling handlers see it.
@@ -151,6 +152,7 @@ public sealed partial class MainWindow : Window
                 e.Handled = true;
             }
         };
+        ActionTree.SelectionChanged += (_, _) => ShowActionDescription(ActionTree.SelectedItem as TreeViewItem);
         ActionTree.Tapped += (_, e) =>
         {
             if ((e.Source as Avalonia.Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true) is { Tag: NodeDefinition } item)
@@ -480,6 +482,12 @@ public sealed partial class MainWindow : Window
         if (workspace is not null)
         {
             ShowCompilation(workspace.Compile());
+
+            // Details lists the selected node's problems, which the edit that started this compilation may have changed.
+            if (GraphCanvas.SelectedItems.Count == 1)
+            {
+                ShowInspector();
+            }
         }
     }
 

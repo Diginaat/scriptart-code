@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 7,
+  "id": "counter-increment",
+  "name": "Increment",
+  "kind": "Function",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "function.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "self",
+      "type": "type.self",
+      "x": 0,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "get",
+      "type": "type.get-property",
+      "x": 240,
+      "y": 160,
+      "properties": {
+        "type": "counter",
+        "property": "count"
+      }
+    },
+    {
+      "id": "add",
+      "type": "math.int.add",
+      "x": 480,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "set",
+      "type": "type.set-property",
+      "x": 720,
+      "y": 0,
+      "properties": {
+        "type": "counter",
+        "property": "count"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "set",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "get",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "set",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "get",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "entry",
+        "pin": "by"
+      },
+      "to": {
+        "node": "add",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "add",
+        "pin": "result"
+      },
+      "to": {
+        "node": "set",
+        "pin": "value"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [],
+  "parameters": [
+    {
+      "id": "by",
+      "name": "by",
+      "type": "int"
+    }
+  ],
+  "owner": "counter",
+  "properties": []
+}

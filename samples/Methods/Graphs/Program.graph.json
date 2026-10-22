@@ -1,0 +1,363 @@
+{
+  "schemaVersion": 7,
+  "id": "program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "new",
+      "type": "type.create",
+      "x": 240,
+      "y": 0,
+      "properties": {
+        "type": "counter"
+      }
+    },
+    {
+      "id": "inc2",
+      "type": "function.call",
+      "x": 480,
+      "y": 0,
+      "properties": {
+        "function": "counter-increment"
+      }
+    },
+    {
+      "id": "two",
+      "type": "literal.int",
+      "x": 240,
+      "y": 200,
+      "properties": {
+        "value": "2"
+      }
+    },
+    {
+      "id": "inc3",
+      "type": "function.call",
+      "x": 720,
+      "y": 0,
+      "properties": {
+        "function": "counter-increment"
+      }
+    },
+    {
+      "id": "three",
+      "type": "literal.int",
+      "x": 480,
+      "y": 200,
+      "properties": {
+        "value": "3"
+      }
+    },
+    {
+      "id": "printCount",
+      "type": "console.write-line",
+      "x": 960,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "getCount",
+      "type": "type.get-property",
+      "x": 720,
+      "y": 300,
+      "properties": {
+        "type": "counter",
+        "property": "count"
+      }
+    },
+    {
+      "id": "countText",
+      "type": "convert.int-to-string",
+      "x": 960,
+      "y": 300,
+      "properties": {}
+    },
+    {
+      "id": "countLabel",
+      "type": "literal.string",
+      "x": 960,
+      "y": 200,
+      "properties": {
+        "value": "Count "
+      }
+    },
+    {
+      "id": "join1",
+      "type": "string.concat",
+      "x": 1200,
+      "y": 250,
+      "properties": {}
+    },
+    {
+      "id": "newVector",
+      "type": "type.create",
+      "x": 960,
+      "y": 450,
+      "properties": {
+        "type": "vector"
+      }
+    },
+    {
+      "id": "length",
+      "type": "function.call",
+      "x": 1200,
+      "y": 0,
+      "properties": {
+        "function": "vector-length-squared"
+      }
+    },
+    {
+      "id": "printLength",
+      "type": "console.write-line",
+      "x": 1440,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "lengthLabel",
+      "type": "literal.string",
+      "x": 1200,
+      "y": 450,
+      "properties": {
+        "value": "Length squared "
+      }
+    },
+    {
+      "id": "lengthText",
+      "type": "convert.int-to-string",
+      "x": 1440,
+      "y": 300,
+      "properties": {}
+    },
+    {
+      "id": "join2",
+      "type": "string.concat",
+      "x": 1680,
+      "y": 350,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "new",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "then"
+      },
+      "to": {
+        "node": "inc2",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "inc2",
+        "pin": "then"
+      },
+      "to": {
+        "node": "inc3",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "inc3",
+        "pin": "then"
+      },
+      "to": {
+        "node": "printCount",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "printCount",
+        "pin": "then"
+      },
+      "to": {
+        "node": "length",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "length",
+        "pin": "then"
+      },
+      "to": {
+        "node": "printLength",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "inc2",
+        "pin": "target"
+      }
+    },
+    {
+      "from": {
+        "node": "two",
+        "pin": "value"
+      },
+      "to": {
+        "node": "inc2",
+        "pin": "by"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "inc3",
+        "pin": "target"
+      }
+    },
+    {
+      "from": {
+        "node": "three",
+        "pin": "value"
+      },
+      "to": {
+        "node": "inc3",
+        "pin": "by"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getCount",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getCount",
+        "pin": "value"
+      },
+      "to": {
+        "node": "countText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "countLabel",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "countText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join1",
+        "pin": "result"
+      },
+      "to": {
+        "node": "printCount",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "newVector",
+        "pin": "value"
+      },
+      "to": {
+        "node": "length",
+        "pin": "target"
+      }
+    },
+    {
+      "from": {
+        "node": "length",
+        "pin": "result"
+      },
+      "to": {
+        "node": "lengthText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "lengthLabel",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "lengthText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join2",
+        "pin": "result"
+      },
+      "to": {
+        "node": "printLength",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [
+    {
+      "id": "note",
+      "x": -40,
+      "y": -60,
+      "width": 1960,
+      "height": 620,
+      "text": "Call methods on a Counter object and a Vector value"
+    }
+  ],
+  "variables": [],
+  "parameters": [],
+  "properties": []
+}

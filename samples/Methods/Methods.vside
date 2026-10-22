@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "Methods",
+  "rootNamespace": "Methods",
+  "graphs": [
+    "Graphs/Program.graph.json",
+    "Graphs/Counter.graph.json",
+    "Graphs/Counter.Increment.graph.json",
+    "Graphs/Vector.graph.json",
+    "Graphs/Vector.LengthSquared.graph.json"
+  ]
+}

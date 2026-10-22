@@ -12,9 +12,9 @@ namespace VisualStudioLikeIDE.Compiler.Nodes;
 public static class LiteralValues
 {
     /// <summary>
-    /// The value a variable of <paramref name="type"/> starts with, given its initial value text: a literal, a new empty list for a
-    /// list type, or a new object for a class or struct of the project. The text of lists, classes, and structs must be blank.
-    /// Null with an <paramref name="error"/> when the text does not fit the type.
+    /// The value a variable of <paramref name="type"/> starts with, given its initial value text: a literal, a new empty list or
+    /// dictionary for a collection type, or a new object for a class or struct of the project. The text of collections, classes,
+    /// and structs must be blank. Null with an <paramref name="error"/> when the text does not fit the type.
     /// </summary>
     public static IrExpression? TryInitialValue(TypeRef type, string text, out string? error)
     {
@@ -26,9 +26,29 @@ public static class LiteralValues
             return error is null ? new IrObjectCreation(type, []) : null;
         }
 
+        if (type.IsDictionary)
+        {
+            error = string.IsNullOrWhiteSpace(text) ? null : "A dictionary always starts empty. Leave the initial value blank and add entries with Set Entry.";
+            return error is null ? new IrObjectCreation(type, []) : null;
+        }
+
         if (type.IsProjectType)
         {
             error = string.IsNullOrWhiteSpace(text) ? null : $"A {type} always starts as a new {type} with its properties' initial values. Leave the initial value blank.";
+            return error is null ? new IrObjectCreation(type, []) : null;
+        }
+
+        if (type.IsTypeParameter)
+        {
+            // Nothing is known about a type parameter's values, so it starts as its default until something is stored in it.
+            error = string.IsNullOrWhiteSpace(text) ? null : $"A value of the type parameter {type} cannot be written as text. Leave the initial value blank.";
+            return error is null ? new IrDefault(type) : null;
+        }
+
+        if (type.IsExternal)
+        {
+            // The compiler checks that the type has a parameterless constructor (or is a struct) before using this.
+            error = string.IsNullOrWhiteSpace(text) ? null : $"A {type} always starts as new {type}(). Leave the initial value blank.";
             return error is null ? new IrObjectCreation(type, []) : null;
         }
 

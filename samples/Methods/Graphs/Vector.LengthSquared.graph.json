@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 7,
+  "id": "vector-length-squared",
+  "name": "LengthSquared",
+  "kind": "Function",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "function.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "self",
+      "type": "type.self",
+      "x": 0,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "x",
+      "type": "type.get-property",
+      "x": 240,
+      "y": 120,
+      "properties": {
+        "type": "vector",
+        "property": "x"
+      }
+    },
+    {
+      "id": "y",
+      "type": "type.get-property",
+      "x": 240,
+      "y": 260,
+      "properties": {
+        "type": "vector",
+        "property": "y"
+      }
+    },
+    {
+      "id": "xx",
+      "type": "math.int.multiply",
+      "x": 480,
+      "y": 120,
+      "properties": {}
+    },
+    {
+      "id": "yy",
+      "type": "math.int.multiply",
+      "x": 480,
+      "y": 260,
+      "properties": {}
+    },
+    {
+      "id": "sum",
+      "type": "math.int.add",
+      "x": 720,
+      "y": 180,
+      "properties": {}
+    },
+    {
+      "id": "return",
+      "type": "function.return",
+      "x": 960,
+      "y": 0,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "return",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "x",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "y",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "x",
+        "pin": "value"
+      },
+      "to": {
+        "node": "xx",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "x",
+        "pin": "value"
+      },
+      "to": {
+        "node": "xx",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "y",
+        "pin": "value"
+      },
+      "to": {
+        "node": "yy",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "y",
+        "pin": "value"
+      },
+      "to": {
+        "node": "yy",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "xx",
+        "pin": "result"
+      },
+      "to": {
+        "node": "sum",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "yy",
+        "pin": "result"
+      },
+      "to": {
+        "node": "sum",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "sum",
+        "pin": "result"
+      },
+      "to": {
+        "node": "return",
+        "pin": "value"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "returnType": "int",
+  "owner": "vector",
+  "properties": []
+}

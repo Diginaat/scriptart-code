@@ -29,7 +29,7 @@ public sealed class VariableGetNode(string variableId, string variableName, Type
 {
     public string VariableId { get; } = variableId;
 
-    public override IReadOnlyDictionary<string, string> InitialProperties { get; } =
+    public override IReadOnlyDictionary<string, string> InitialProperties { get; init; } =
         new Dictionary<string, string> { [VariableNodes.VariableProperty] = variableId };
 
     public override IrExpression Lower(ExpressionLoweringContext context)
@@ -49,7 +49,7 @@ public sealed class VariableSetNode(string variableId, string variableName, Type
 {
     public string VariableId { get; } = variableId;
 
-    public override IReadOnlyDictionary<string, string> InitialProperties { get; } =
+    public override IReadOnlyDictionary<string, string> InitialProperties { get; init; } =
         new Dictionary<string, string> { [VariableNodes.VariableProperty] = variableId };
 
     public override void Lower(StatementLoweringContext context)

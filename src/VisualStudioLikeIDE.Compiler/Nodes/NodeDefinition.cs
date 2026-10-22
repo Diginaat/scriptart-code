@@ -50,7 +50,7 @@ public abstract class NodeDefinition
     /// Properties a new node of this definition starts with, beyond the defaults of <see cref="Properties"/>. Variable nodes use
     /// this to record which variable they refer to; that value is not edited like a property.
     /// </summary>
-    public virtual IReadOnlyDictionary<string, string> InitialProperties { get; } = new Dictionary<string, string>();
+    public virtual IReadOnlyDictionary<string, string> InitialProperties { get; init; } = new Dictionary<string, string>();
 
     public PropertyDefinition? FindProperty(string propertyId) =>
         Properties.FirstOrDefault(property => property.Id == propertyId);
@@ -59,6 +59,11 @@ public abstract class NodeDefinition
     public virtual string? ValidateProperty(PropertyDefinition definition, string value)
     {
         ArgumentNullException.ThrowIfNull(definition);
+        if (definition.Choices is { } choices)
+        {
+            return choices.Contains(value, StringComparer.Ordinal) ? null : $"'{value}' is not one of {string.Join(", ", choices)}.";
+        }
+
         return LiteralValues.TryParse(definition.Type, value, out _, out string? error) ? null : error;
     }
 }

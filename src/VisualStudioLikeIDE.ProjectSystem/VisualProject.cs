@@ -38,6 +38,9 @@ public sealed class VisualProject
 
     private readonly List<ProjectGraph> graphs;
 
+    // Graph files of removed or renamed graphs, deleted by the next Save once the project file no longer lists them.
+    private readonly HashSet<string> obsoleteFiles = new(StringComparer.OrdinalIgnoreCase);
+
     private VisualProject(string projectFilePath, ProjectDocument document, List<ProjectGraph> graphs)
     {
         ProjectFilePath = Path.GetFullPath(projectFilePath);
@@ -84,6 +87,32 @@ public sealed class VisualProject
     }
 
     /// <summary>
+    /// Adds a method named <paramref name="name"/> to the class or struct graph <paramref name="owner"/>, like <see cref="AddFunction"/>,
+    /// as <c>Graphs/{owner}.{name}.graph.json</c>.
+    /// </summary>
+    public ProjectGraph AddMethod(GraphDocument owner, string name) => AddMember(owner, name, GraphKind.Function);
+
+    /// <summary>
+    /// Adds a constructor of the class or struct graph <paramref name="owner"/>, like <see cref="AddMethod"/>. Its
+    /// <paramref name="name"/> only names the graph and its files; the generated constructor has the type's name.
+    /// </summary>
+    public ProjectGraph AddConstructor(GraphDocument owner, string name) => AddMember(owner, name, GraphKind.Constructor);
+
+    private ProjectGraph AddMember(GraphDocument owner, string name, GraphKind kind)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        if (!graphs.Exists(graph => graph.Graph == owner) || owner.Kind is not (GraphKind.Class or GraphKind.Struct))
+        {
+            throw new ArgumentException($"'{owner.Name}' is not a class or struct of this project.", nameof(owner));
+        }
+
+        GraphDocument member = GraphDocument.CreateEmpty(name, kind);
+        member.Owner = owner.Id;
+        member.Nodes.Add(new GraphNode { Id = GraphDocument.NewId(), Type = FunctionNodes.EntryTypeId, X = 0, Y = 0 });
+        return AddGraph(member, $"{owner.Name}.{name}");
+    }
+
+    /// <summary>
     /// Adds a class or struct graph (<paramref name="kind"/>) named <paramref name="name"/>, with no properties, like
     /// <see cref="AddFunction"/>.
     /// </summary>
@@ -97,7 +126,41 @@ public sealed class VisualProject
         return AddGraph(GraphDocument.CreateEmpty(name, kind));
     }
 
-    private ProjectGraph AddGraph(GraphDocument graph)
+    /// <summary>
+    /// The file <paramref name="graph"/> belongs in: <c>Graphs/{name}.graph.json</c>, or <c>Graphs/{type}.{name}.graph.json</c>
+    /// for a method or constructor, so that two types can each have a method with the same name.
+    /// </summary>
+    public string ExpectedPath(GraphDocument graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        string? owner = graph.Owner is null ? null : graphs.Find(type => type.Graph.Id == graph.Owner)?.Graph.Name;
+        return $"{GraphsFolder}/{(owner is null ? "" : owner + ".")}{graph.Name}{GraphSerializer.FileExtension}";
+    }
+
+    /// <summary>
+    /// Removes <paramref name="graph"/> and, for a class or struct, its methods and constructors. Their files are deleted by the
+    /// next <see cref="Save"/>. The entry graph cannot be removed. Returns the removed graphs.
+    /// </summary>
+    public IReadOnlyList<ProjectGraph> RemoveGraph(GraphDocument graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        if (graph.Kind == GraphKind.EntryPoint)
+        {
+            throw new InvalidOperationException("The program graph cannot be removed; every program starts there.");
+        }
+
+        ProjectGraph[] removed = [.. graphs.Where(candidate => candidate.Graph == graph || (candidate.Graph.Owner is not null && candidate.Graph.Owner == graph.Id))];
+        foreach (ProjectGraph item in removed)
+        {
+            graphs.Remove(item);
+            Document.Graphs.Remove(item.RelativePath);
+            obsoleteFiles.Add(item.RelativePath);
+        }
+
+        return removed;
+    }
+
+    private ProjectGraph AddGraph(GraphDocument graph, string? fileName = null)
     {
         string kind = graph.Kind.ToString().ToLowerInvariant();
         if (!GraphCompiler.IsValidIdentifier(graph.Name))
@@ -105,7 +168,7 @@ public sealed class VisualProject
             throw new ArgumentException($"'{graph.Name}' is not a valid {kind} name. Use letters, digits, and underscores, starting with a letter.", nameof(graph));
         }
 
-        string relativePath = $"{GraphsFolder}/{graph.Name}{GraphSerializer.FileExtension}";
+        string relativePath = $"{GraphsFolder}/{fileName ?? graph.Name}{GraphSerializer.FileExtension}";
         if (graphs.Exists(existing => string.Equals(existing.RelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
             || File.Exists(ResolveInside(DirectoryPath, relativePath)))
         {
@@ -170,16 +233,41 @@ public sealed class VisualProject
         return new VisualProject(projectFilePath, document, graphs);
     }
 
-    /// <summary>Writes the project file and every graph.</summary>
+    /// <summary>
+    /// Writes the project file and every graph. A renamed graph moves to the file its name now calls for (see
+    /// <see cref="ExpectedPath"/>) unless that name is not a valid identifier or the file is taken; the old file, and the files of
+    /// removed graphs, are deleted only after the project file stops listing them.
+    /// </summary>
     public void Save()
     {
-        foreach (ProjectGraph graph in graphs)
+        for (int index = 0; index < graphs.Count; index++)
         {
+            ProjectGraph graph = graphs[index];
+            string expected = ExpectedPath(graph.Graph);
+            if (expected != graph.RelativePath && GraphCompiler.IsValidIdentifier(graph.Graph.Name) && IsFree(expected, graph))
+            {
+                obsoleteFiles.Add(graph.RelativePath);
+                obsoleteFiles.Remove(expected);
+                Document.Graphs[Document.Graphs.IndexOf(graph.RelativePath)] = expected;
+                graphs[index] = graph = graph with { RelativePath = expected };
+            }
+
             GraphSerializer.Save(ResolveInside(DirectoryPath, graph.RelativePath), graph.Graph);
         }
 
         AtomicFile.WriteAllText(ProjectFilePath, ProjectSerializer.Serialize(Document));
+        foreach (string obsolete in obsoleteFiles.Where(path => !graphs.Exists(graph => string.Equals(graph.RelativePath, path, StringComparison.OrdinalIgnoreCase))))
+        {
+            File.Delete(ResolveInside(DirectoryPath, obsolete));
+        }
+
+        obsoleteFiles.Clear();
     }
+
+    // A path another graph does not use, and that is not on disk unless only the case differs or it is a file being deleted.
+    private bool IsFree(string path, ProjectGraph moving) =>
+        !graphs.Exists(other => other != moving && string.Equals(other.RelativePath, path, StringComparison.OrdinalIgnoreCase))
+        && (!File.Exists(ResolveInside(DirectoryPath, path)) || obsoleteFiles.Contains(path) || string.Equals(path, moving.RelativePath, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>The assemblies the <c>.csproj</c> references, read from disk on each call because restore and the user can change them.</summary>
     public ProjectReferences References => ProjectReferences.Resolve(CsprojPath);
@@ -220,7 +308,7 @@ public sealed class VisualProject
             Path.Combine(GeneratedDirectory, source.RelativePath),
             source.Text,
             source,
-            graphs.First(graph => GraphCompiler.GeneratedFileName(graph.Graph) == source.RelativePath).Graph.Id))];
+            graphs.First(graph => GraphCompiler.GeneratedFileName(graph.Graph, GraphDocuments) == source.RelativePath).Graph.Id))];
         verification.AddRange(HandwrittenSources().Select(path => new VerificationSource(path, File.ReadAllText(path))));
         diagnostics.AddRange(RoslynVerifier.Verify(Document.Name, verification, isExecutable: true, References.AssemblyPaths));
         if (diagnostics.Any(diagnostic => diagnostic.IsError))

@@ -77,6 +77,24 @@ public sealed class EndToEndTests
         Assert.Equal("Ada has 100\nPoint 3, 4\n", await GenerateBuildAndRun(project, input: null));
     }
 
+    [Fact]
+    public async Task MethodsSampleChangesAnObjectAndComputesFromAValue()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Methods", directory.Path);
+
+        Assert.Equal("Count 5\nLength squared 25\n", await GenerateBuildAndRun(project, input: null));
+    }
+
+    [Fact]
+    public async Task DictionariesSampleCountsWordsIntoAListOfStructs()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Dictionaries", directory.Path);
+
+        Assert.Equal("the: 2\ncat: 1\nand: 1\nhat: 1\n4 different words\n", await GenerateBuildAndRun(project, input: null));
+    }
+
     [Theory]
     [InlineData("21", "42\n")]
     [InlineData("abc", "Not a number: The input string 'abc' was not in a correct format.\n")]
@@ -148,6 +166,8 @@ public sealed class EndToEndTests
     [InlineData("Exceptions")]
     [InlineData("Collections")]
     [InlineData("Types")]
+    [InlineData("Dictionaries")]
+    [InlineData("Methods")]
     public void CheckedInSampleCodeMatchesGenerator(string sample)
     {
         // The samples directory holds the generated code so samples build without the IDE. It must stay current.

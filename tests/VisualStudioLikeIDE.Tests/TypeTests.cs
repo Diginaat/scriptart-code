@@ -11,11 +11,11 @@ public sealed class TypeTests
 {
     private static readonly GraphCompiler Compiler = new(NodeLibrary.CreateDefault());
 
-    private static GraphCompilationResult Compile(GraphBuilder graph, params GraphBuilder[] project) =>
+    internal static GraphCompilationResult Compile(GraphBuilder graph, params GraphBuilder[] project) =>
         Compiler.Compile(graph.Graph, new GraphCompilationOptions("Demo", [.. project.Select(other => other.Graph)]), "Graphs/Test.graph.json");
 
     /// <summary>Compiles every graph of the project, checks Roslyn accepts them together, and returns each file's text.</summary>
-    private static string[] CompileProject(params GraphBuilder[] project)
+    internal static string[] CompileProject(params GraphBuilder[] project)
     {
         GeneratedSource[] sources = [.. project.Select(graph =>
         {
@@ -177,6 +177,30 @@ public sealed class TypeTests
     }
 
     [Fact]
+    public void ChainedWithNodesNeedNoParentheses()
+    {
+        GraphBuilder point = GraphBuilder.Type("Point", GraphKind.Struct);
+        string x = point.Property("X", "int", "0");
+        string y = point.Property("Y", "int", "0");
+        var program = new GraphBuilder();
+        string variable = program.Variable("position", "Point", "");
+        string entry = program.Node(BuiltInNodes.EntryTypeId);
+        string set = program.VariableNode(variable, set: true);
+        string withX = program.TypeNode(TypeNodes.WithTypeId, point.Graph, x);
+        string withY = program.TypeNode(TypeNodes.WithTypeId, point.Graph, y);
+        program.Then(entry, set)
+            .Connect(program.TypeNode(TypeNodes.CreateTypeId, point.Graph), "value", withX, "object")
+            .Connect(program.Node("literal.int", "1"), "value", withX, "value")
+            .Connect(withX, "result", withY, "object")
+            .Connect(program.Node("literal.int", "2"), "value", withY, "value")
+            .Connect(withY, "result", set, "value");
+
+        string[] sources = CompileProject(program, point);
+
+        Assert.Contains("position = new Point() with { X = 1 } with { Y = 2 };", sources[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FunctionsTakeAndReturnClassesAndStructs()
     {
         GraphBuilder point = GraphBuilder.Type("Point", GraphKind.Struct);
@@ -194,7 +218,7 @@ public sealed class TypeTests
         string[] sources = CompileProject(program, origin, point);
 
         Assert.Contains("Origin(new Point());", sources[0], StringComparison.Ordinal);
-        Assert.Contains("private static Point Origin(Point start)", sources[1], StringComparison.Ordinal);
+        Assert.Contains("public static Point Origin(Point start)", sources[1], StringComparison.Ordinal);
     }
 
     [Fact]

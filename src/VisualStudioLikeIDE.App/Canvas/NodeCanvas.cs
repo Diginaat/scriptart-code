@@ -72,7 +72,13 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     {
         Focusable = true;
         ClipToBounds = true;
+        nodeTipTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) };
+        nodeTipTimer.Tick += (_, _) => ShowNodeTip();
     }
+
+    // The node under the pointer, whose hover card opens after a short rest so moving across the graph does not flicker.
+    private string? tipNodeId;
+    private readonly Avalonia.Threading.DispatcherTimer nodeTipTimer;
 
     private enum Gesture
     {
@@ -102,6 +108,9 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
     /// <summary>The user asked to edit a node's value in place (double-click on the value row, or F2).</summary>
     public event EventHandler<ValueEditRequestedEventArgs>? ValueEditRequested;
+
+    /// <summary>The user double-clicked a node outside its value row; the host opens or renames what the node refers to.</summary>
+    public event EventHandler<string>? NodeActivated;
 
     /// <summary>Selected node and comment IDs.</summary>
     public IReadOnlyCollection<string> SelectedItems => selection;
@@ -350,6 +359,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        HideNodeTip();
         if (editor is null)
         {
             return;
@@ -407,6 +417,14 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
                 gesture = Gesture.None;
                 e.Pointer.Capture(null);
                 RequestValueEdit(hit);
+                return;
+            }
+
+            if (e.ClickCount == 2)
+            {
+                gesture = Gesture.None;
+                e.Pointer.Capture(null);
+                NodeActivated?.Invoke(this, hit.Node.Id);
                 return;
             }
 
@@ -723,10 +741,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
         foreach (GraphNode node in editor.Graph.Nodes)
         {
-            if (editor.DefinitionOf(node) is { } definition)
-            {
-                layouts[node.Id] = NodeLayout.Create(node, definition, MeasureText);
-            }
+            layouts[node.Id] = NodeLayout.Create(node, editor.DefinitionOf(node) ?? editor.PlaceholderFor(node), MeasureText);
         }
 
         foreach (GraphConnection connection in editor.Graph.Connections)
@@ -961,9 +976,84 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
         }
     }
 
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        HideNodeTip();
+    }
+
+    private void HideNodeTip()
+    {
+        nodeTipTimer.Stop();
+        tipNodeId = null;
+        Avalonia.Controls.ToolTip.SetIsOpen(this, false);
+    }
+
+    private void ShowNodeTip()
+    {
+        nodeTipTimer.Stop();
+        if (gesture == Gesture.None && tipNodeId is not null && layouts.TryGetValue(tipNodeId, out NodeLayout? layout))
+        {
+            Avalonia.Controls.ToolTip.SetTip(this, new Avalonia.Controls.TextBlock { Text = NodeTip(layout), MaxWidth = 360, TextWrapping = TextWrapping.Wrap });
+            Avalonia.Controls.ToolTip.SetPlacement(this, Avalonia.Controls.PlacementMode.Pointer);
+            Avalonia.Controls.ToolTip.SetIsOpen(this, true);
+        }
+    }
+
+    /// <summary>The hover card of a node: what it does, its values in and out, and what double-clicking it does.</summary>
+    private static string NodeTip(NodeLayout layout)
+    {
+        NodeDefinition definition = layout.Definition;
+        static string Pins(IEnumerable<PinDefinition> pins) =>
+            string.Join(", ", pins.Select(pin => $"{(pin.DisplayName.Length == 0 ? pin.Id : pin.DisplayName)} ({pin.DataType!.DisplayName})"));
+        PinDefinition[] inputs = [.. definition.Pins.Where(pin => !pin.IsExecution && pin.Direction == PinDirection.Input)];
+        PinDefinition[] outputs = [.. definition.Pins.Where(pin => !pin.IsExecution && pin.Direction == PinDirection.Output)];
+        var text = new System.Text.StringBuilder();
+        text.Append(definition.DisplayName).Append(" · ").Append(definition.Category).Append("\n\n").Append(definition.Description);
+        if (inputs.Length > 0)
+        {
+            text.Append("\n\nTakes: ").Append(Pins(inputs));
+        }
+
+        if (outputs.Length > 0)
+        {
+            text.Append("\nGives: ").Append(Pins(outputs));
+        }
+
+        if (definition.Pins.Any(pin => pin.IsExecution))
+        {
+            text.Append("\n\nRuns when the white execution wire reaches it, then continues along its outgoing white wire.");
+        }
+        else
+        {
+            text.Append("\n\nNo execution wire: its value is worked out wherever another node uses it.");
+        }
+
+        string? hint = layout.Node.Type switch
+        {
+            FunctionNodes.CallTypeId => "Double-click to open the function.",
+            TypeNodes.CreateTypeId when layout.Node.Properties.ContainsKey(TypeNodes.ConstructorProperty) => "Double-click to open the constructor.",
+            VariableNodes.GetTypeId or VariableNodes.SetTypeId => "Double-click to rename the variable.",
+            FunctionNodes.EntryTypeId => "Double-click to rename the function.",
+            _ => layout.PreviewBounds is not null ? "Double-click the value to edit it." : null,
+        };
+        return hint is null ? text.ToString() : text.Append('\n').Append(hint).ToString();
+    }
+
     private void UpdateHover(Point world)
     {
         PinRef? pin = HitPin(world);
+        string? nodeId = pin is null ? HitNode(world)?.Node.Id : null;
+        if (nodeId != tipNodeId)
+        {
+            HideNodeTip();
+            tipNodeId = nodeId;
+            if (nodeId is not null)
+            {
+                nodeTipTimer.Start();
+            }
+        }
+
         if (pin != hoveredPin)
         {
             hoveredPin = pin;

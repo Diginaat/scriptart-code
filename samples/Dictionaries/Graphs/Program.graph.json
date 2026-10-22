@@ -1,0 +1,919 @@
+{
+  "schemaVersion": 6,
+  "id": "program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "sentence",
+      "type": "literal.string",
+      "x": 0,
+      "y": 160,
+      "properties": {
+        "value": "the cat and the hat"
+      }
+    },
+    {
+      "id": "space",
+      "type": "literal.string",
+      "x": 0,
+      "y": 260,
+      "properties": {
+        "value": " "
+      }
+    },
+    {
+      "id": "split",
+      "type": "string.split",
+      "x": 240,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "words",
+      "type": "flow.foreach.string",
+      "x": 240,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "known",
+      "type": "core.branch",
+      "x": 480,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "getCounts1",
+      "type": "variable.get",
+      "x": 240,
+      "y": 360,
+      "properties": {
+        "variable": "counts"
+      }
+    },
+    {
+      "id": "contains",
+      "type": "dictionary.contains-key",
+      "x": 480,
+      "y": 160,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "again",
+      "type": "dictionary.set",
+      "x": 720,
+      "y": 0,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "getCounts2",
+      "type": "variable.get",
+      "x": 480,
+      "y": 360,
+      "properties": {
+        "variable": "counts"
+      }
+    },
+    {
+      "id": "current",
+      "type": "dictionary.get",
+      "x": 720,
+      "y": 260,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "one",
+      "type": "literal.int",
+      "x": 720,
+      "y": 400,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "plus",
+      "type": "math.int.add",
+      "x": 960,
+      "y": 260,
+      "properties": {}
+    },
+    {
+      "id": "first",
+      "type": "dictionary.set",
+      "x": 720,
+      "y": 520,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "getCounts3",
+      "type": "variable.get",
+      "x": 480,
+      "y": 560,
+      "properties": {
+        "variable": "counts"
+      }
+    },
+    {
+      "id": "one2",
+      "type": "literal.int",
+      "x": 480,
+      "y": 660,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "zero",
+      "type": "literal.int",
+      "x": 720,
+      "y": 360,
+      "properties": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "keys",
+      "type": "dictionary.keys",
+      "x": 1200,
+      "y": 160,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "getCounts4",
+      "type": "variable.get",
+      "x": 960,
+      "y": 160,
+      "properties": {
+        "variable": "counts"
+      }
+    },
+    {
+      "id": "eachKey",
+      "type": "flow.foreach.string",
+      "x": 1200,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "add",
+      "type": "list.add",
+      "x": 1440,
+      "y": 0,
+      "properties": {
+        "collection": "List<Tally>"
+      }
+    },
+    {
+      "id": "getTallies1",
+      "type": "variable.get",
+      "x": 1200,
+      "y": 360,
+      "properties": {
+        "variable": "tallies"
+      }
+    },
+    {
+      "id": "newTally",
+      "type": "type.create",
+      "x": 1200,
+      "y": 460,
+      "properties": {
+        "type": "tally"
+      }
+    },
+    {
+      "id": "withWord",
+      "type": "type.with-property",
+      "x": 1440,
+      "y": 360,
+      "properties": {
+        "type": "tally",
+        "property": "word"
+      }
+    },
+    {
+      "id": "getCounts5",
+      "type": "variable.get",
+      "x": 1200,
+      "y": 600,
+      "properties": {
+        "variable": "counts"
+      }
+    },
+    {
+      "id": "count",
+      "type": "dictionary.get",
+      "x": 1440,
+      "y": 600,
+      "properties": {
+        "collection": "Dictionary<string, int>"
+      }
+    },
+    {
+      "id": "withCount",
+      "type": "type.with-property",
+      "x": 1680,
+      "y": 360,
+      "properties": {
+        "type": "tally",
+        "property": "count"
+      }
+    },
+    {
+      "id": "zero2",
+      "type": "literal.int",
+      "x": 1200,
+      "y": 700,
+      "properties": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "eachTally",
+      "type": "flow.foreach",
+      "x": 1680,
+      "y": 0,
+      "properties": {
+        "collection": "List<Tally>"
+      }
+    },
+    {
+      "id": "getTallies2",
+      "type": "variable.get",
+      "x": 1440,
+      "y": 800,
+      "properties": {
+        "variable": "tallies"
+      }
+    },
+    {
+      "id": "print",
+      "type": "console.write-line",
+      "x": 1920,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "getWord",
+      "type": "type.get-property",
+      "x": 1680,
+      "y": 900,
+      "properties": {
+        "type": "tally",
+        "property": "word"
+      }
+    },
+    {
+      "id": "colon",
+      "type": "literal.string",
+      "x": 1680,
+      "y": 1000,
+      "properties": {
+        "value": ": "
+      }
+    },
+    {
+      "id": "join1",
+      "type": "string.concat",
+      "x": 1920,
+      "y": 900,
+      "properties": {}
+    },
+    {
+      "id": "getCount",
+      "type": "type.get-property",
+      "x": 1680,
+      "y": 1100,
+      "properties": {
+        "type": "tally",
+        "property": "count"
+      }
+    },
+    {
+      "id": "countText",
+      "type": "convert.int-to-string",
+      "x": 1920,
+      "y": 1100,
+      "properties": {}
+    },
+    {
+      "id": "join2",
+      "type": "string.concat",
+      "x": 2160,
+      "y": 1000,
+      "properties": {}
+    },
+    {
+      "id": "printTotal",
+      "type": "console.write-line",
+      "x": 1920,
+      "y": 1300,
+      "properties": {}
+    },
+    {
+      "id": "getTallies3",
+      "type": "variable.get",
+      "x": 1680,
+      "y": 1400,
+      "properties": {
+        "variable": "tallies"
+      }
+    },
+    {
+      "id": "total",
+      "type": "list.count",
+      "x": 1920,
+      "y": 1400,
+      "properties": {
+        "collection": "List<Tally>"
+      }
+    },
+    {
+      "id": "totalText",
+      "type": "convert.int-to-string",
+      "x": 2160,
+      "y": 1400,
+      "properties": {}
+    },
+    {
+      "id": "words2",
+      "type": "literal.string",
+      "x": 2160,
+      "y": 1500,
+      "properties": {
+        "value": " different words"
+      }
+    },
+    {
+      "id": "join3",
+      "type": "string.concat",
+      "x": 2400,
+      "y": 1400,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "words",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "sentence",
+        "pin": "value"
+      },
+      "to": {
+        "node": "split",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "space",
+        "pin": "value"
+      },
+      "to": {
+        "node": "split",
+        "pin": "separator"
+      }
+    },
+    {
+      "from": {
+        "node": "split",
+        "pin": "parts"
+      },
+      "to": {
+        "node": "words",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "body"
+      },
+      "to": {
+        "node": "known",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts1",
+        "pin": "value"
+      },
+      "to": {
+        "node": "contains",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "item"
+      },
+      "to": {
+        "node": "contains",
+        "pin": "key"
+      }
+    },
+    {
+      "from": {
+        "node": "contains",
+        "pin": "result"
+      },
+      "to": {
+        "node": "known",
+        "pin": "condition"
+      }
+    },
+    {
+      "from": {
+        "node": "known",
+        "pin": "true"
+      },
+      "to": {
+        "node": "again",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "known",
+        "pin": "false"
+      },
+      "to": {
+        "node": "first",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "again",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "item"
+      },
+      "to": {
+        "node": "again",
+        "pin": "key"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "current",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "item"
+      },
+      "to": {
+        "node": "current",
+        "pin": "key"
+      }
+    },
+    {
+      "from": {
+        "node": "zero",
+        "pin": "value"
+      },
+      "to": {
+        "node": "current",
+        "pin": "default"
+      }
+    },
+    {
+      "from": {
+        "node": "current",
+        "pin": "value"
+      },
+      "to": {
+        "node": "plus",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "one",
+        "pin": "value"
+      },
+      "to": {
+        "node": "plus",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "plus",
+        "pin": "result"
+      },
+      "to": {
+        "node": "again",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts3",
+        "pin": "value"
+      },
+      "to": {
+        "node": "first",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "item"
+      },
+      "to": {
+        "node": "first",
+        "pin": "key"
+      }
+    },
+    {
+      "from": {
+        "node": "one2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "first",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "words",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "eachKey",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts4",
+        "pin": "value"
+      },
+      "to": {
+        "node": "keys",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "keys",
+        "pin": "keys"
+      },
+      "to": {
+        "node": "eachKey",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "eachKey",
+        "pin": "body"
+      },
+      "to": {
+        "node": "add",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getTallies1",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "newTally",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withWord",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "eachKey",
+        "pin": "item"
+      },
+      "to": {
+        "node": "withWord",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "withWord",
+        "pin": "result"
+      },
+      "to": {
+        "node": "withCount",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getCounts5",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count",
+        "pin": "dictionary"
+      }
+    },
+    {
+      "from": {
+        "node": "eachKey",
+        "pin": "item"
+      },
+      "to": {
+        "node": "count",
+        "pin": "key"
+      }
+    },
+    {
+      "from": {
+        "node": "zero2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count",
+        "pin": "default"
+      }
+    },
+    {
+      "from": {
+        "node": "count",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withCount",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "withCount",
+        "pin": "result"
+      },
+      "to": {
+        "node": "add",
+        "pin": "item"
+      }
+    },
+    {
+      "from": {
+        "node": "eachKey",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "eachTally",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getTallies2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "eachTally",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "eachTally",
+        "pin": "body"
+      },
+      "to": {
+        "node": "print",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "eachTally",
+        "pin": "item"
+      },
+      "to": {
+        "node": "getWord",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getWord",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "colon",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "eachTally",
+        "pin": "item"
+      },
+      "to": {
+        "node": "getCount",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getCount",
+        "pin": "value"
+      },
+      "to": {
+        "node": "countText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "join1",
+        "pin": "result"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "countText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join2",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "eachTally",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "printTotal",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getTallies3",
+        "pin": "value"
+      },
+      "to": {
+        "node": "total",
+        "pin": "list"
+      }
+    },
+    {
+      "from": {
+        "node": "total",
+        "pin": "count"
+      },
+      "to": {
+        "node": "totalText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "totalText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join3",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "words2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join3",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join3",
+        "pin": "result"
+      },
+      "to": {
+        "node": "printTotal",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [
+    {
+      "id": "countComment",
+      "x": -40,
+      "y": -60,
+      "width": 1160,
+      "height": 800,
+      "text": "Count each word in a dictionary"
+    },
+    {
+      "id": "tallyComment",
+      "x": 1160,
+      "y": -60,
+      "width": 1480,
+      "height": 1640,
+      "text": "Copy the entries into a list of Tally structs and print it"
+    }
+  ],
+  "variables": [
+    {
+      "id": "counts",
+      "name": "counts",
+      "type": "Dictionary<string, int>",
+      "value": ""
+    },
+    {
+      "id": "tallies",
+      "name": "tallies",
+      "type": "List<Tally>",
+      "value": ""
+    }
+  ],
+  "parameters": [],
+  "properties": []
+}

@@ -176,4 +176,63 @@ public sealed class ProjectSystemTests
         Assert.False(references.PackagesNotRestored);
         Assert.Equal([Path.Combine(directory.Path, "lib", "Local.dll"), foo], references.AssemblyPaths.Order(StringComparer.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void RenamedGraphsMoveToTheirNewFilesOnSaveAndMethodsFollowTheirType()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = VisualProject.Create(directory.Path, "Demo");
+        ProjectGraph account = project.AddType("Account", GraphKind.Class);
+        project.AddMethod(account.Graph, "Close");
+        ProjectGraph helper = project.AddFunction("Helper");
+        project.Save();
+
+        account.Graph.Name = "Wallet";
+        helper.Graph.Name = "Assist";
+        project.Save();
+
+        string graphs = Path.Combine(directory.Path, "Graphs");
+        Assert.Equal(["Assist.graph.json", "Program.graph.json", "Wallet.Close.graph.json", "Wallet.graph.json"],
+            Directory.GetFiles(graphs).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        VisualProject reloaded = VisualProject.Load(project.ProjectFilePath);
+        Assert.Equal(["Graphs/Program.graph.json", "Graphs/Wallet.graph.json", "Graphs/Wallet.Close.graph.json", "Graphs/Assist.graph.json"],
+            reloaded.Graphs.Select(graph => graph.RelativePath));
+    }
+
+    [Fact]
+    public void RenameKeepsTheOldFileWhenTheNewNameIsInvalidOrTaken()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = VisualProject.Create(directory.Path, "Demo");
+        ProjectGraph first = project.AddFunction("First");
+        project.AddFunction("Second");
+        project.Save();
+
+        first.Graph.Name = "Second";
+        project.Save();
+        first.Graph.Name = "not valid";
+        project.Save();
+
+        Assert.Equal("Graphs/First.graph.json", project.Graphs.Single(graph => graph.Graph == first.Graph).RelativePath);
+        Assert.True(File.Exists(Path.Combine(directory.Path, "Graphs", "First.graph.json")));
+        Assert.True(File.Exists(Path.Combine(directory.Path, "Graphs", "Second.graph.json")));
+    }
+
+    [Fact]
+    public void RemovingATypeRemovesItsMembersAndDeletesTheirFilesOnSave()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = VisualProject.Create(directory.Path, "Demo");
+        ProjectGraph point = project.AddType("Point", GraphKind.Struct);
+        project.AddConstructor(point.Graph, "FromX");
+        project.Save();
+
+        IReadOnlyList<ProjectGraph> removed = project.RemoveGraph(point.Graph);
+        project.Save();
+
+        Assert.Equal(2, removed.Count);
+        Assert.Equal(["Program.graph.json"], Directory.GetFiles(Path.Combine(directory.Path, "Graphs")).Select(Path.GetFileName));
+        Assert.Equal(["Graphs/Program.graph.json"], VisualProject.Load(project.ProjectFilePath).Document.Graphs);
+        Assert.Throws<InvalidOperationException>(() => project.RemoveGraph(project.Graphs[0].Graph));
+    }
 }

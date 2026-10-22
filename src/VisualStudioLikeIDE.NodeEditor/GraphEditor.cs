@@ -76,7 +76,7 @@ public sealed partial class GraphEditor
 
     /// <summary>The type with this C# name among the simple types, lists, and the project's classes and structs.</summary>
     private TypeRef ResolveType(string type, string kind) =>
-        TypeRef.FromName(type, ProjectGraphs) ?? throw new ArgumentException($"Unsupported {kind} type '{type}'.", nameof(type));
+        TypeRef.FromName(type, ProjectGraphs, Graph) ?? throw new ArgumentException($"Unsupported {kind} type '{type}'.", nameof(type));
 
     public GraphNode AddNode(string typeId, double x, double y) => AddNode(FindDefinition(typeId), x, y);
 
@@ -541,6 +541,39 @@ public sealed partial class GraphEditor
         }
     }
 
+    /// <summary>
+    /// A stand-in for drawing a node whose definition cannot be resolved, such as a node of a missing library, variable, or
+    /// function, or of a generic type without its type arguments. It has the node's wired pins, each typed like the pin at the
+    /// other end, so the node and its wires stay visible and can be selected and deleted. It is never compiled.
+    /// </summary>
+    public NodeDefinition PlaceholderFor(GraphNode node)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        List<PinDefinition> pins = [];
+        foreach (GraphConnection connection in Graph.Connections)
+        {
+            bool isOutput = connection.From.Node == node.Id;
+            if (!isOutput && connection.To.Node != node.Id)
+            {
+                continue;
+            }
+
+            string pinId = isOutput ? connection.From.Pin : connection.To.Pin;
+            PinDirection direction = isOutput ? PinDirection.Output : PinDirection.Input;
+            if (pins.Exists(pin => pin.Id == pinId))
+            {
+                continue;
+            }
+
+            // When the other end is unresolved too, the conventional execution pin IDs tell execution wires from data wires.
+            PinDefinition? other = FindPin(isOutput ? connection.To : connection.From);
+            TypeRef? type = other is not null ? other.DataType : pinId is "exec" or "then" ? null : UnknownPinType;
+            pins.Add(new PinDefinition(pinId, pinId, direction, type));
+        }
+
+        return new PlaceholderNodeDefinition(node.Type, pins);
+    }
+
     public PinDefinition? FindPin(PinRef pin)
     {
         ArgumentNullException.ThrowIfNull(pin);
@@ -641,4 +674,9 @@ public sealed partial class GraphEditor
     }
 
     private sealed record Edit(string Description, Action Apply, Action Revert);
+
+    private static readonly TypeRef UnknownPinType = new("System", "Object", "object");
+
+    private sealed class PlaceholderNodeDefinition(string typeId, IReadOnlyList<PinDefinition> pins)
+        : NodeDefinition(typeId, $"Unresolved {typeId}", "Unresolved", "This node cannot be resolved; see Problems. Delete it or restore what it refers to.", pins);
 }

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 6,
+  "id": "tally",
+  "name": "Tally",
+  "kind": "Struct",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "word",
+      "name": "Word",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "id": "count",
+      "name": "Count",
+      "type": "int",
+      "value": "0"
+    }
+  ]
+}

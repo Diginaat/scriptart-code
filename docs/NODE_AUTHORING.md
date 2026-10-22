@@ -47,4 +47,4 @@ Most definitions are registered once and shared by every node of their type. Get
 
 ## Third-party libraries
 
-Loading node libraries from external assemblies is not implemented yet (Phase 5). Such libraries execute code inside the IDE with the user's permissions and must be treated as untrusted; the plan is explicit user opt-in per library, no automatic loading from opened projects.
+Loading node libraries from external assemblies is not implemented yet (Phase 6). Such libraries execute code inside the IDE with the user's permissions and must be treated as untrusted; the plan is explicit user opt-in per library, no automatic loading from opened projects.

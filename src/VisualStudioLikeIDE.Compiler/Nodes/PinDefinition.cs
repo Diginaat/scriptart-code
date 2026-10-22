@@ -44,4 +44,5 @@ public sealed record PinDefinition(string Id, string DisplayName, PinDirection D
 }
 
 /// <summary>An editable value stored in <c>GraphNode.Properties</c>, such as a literal.</summary>
-public sealed record PropertyDefinition(string Id, string DisplayName, TypeRef Type, string DefaultValue);
+/// <param name="Choices">The only values the property accepts, offered as a list by the editor; null when any value of <paramref name="Type"/> is accepted.</param>
+public sealed record PropertyDefinition(string Id, string DisplayName, TypeRef Type, string DefaultValue, IReadOnlyList<string>? Choices = null);

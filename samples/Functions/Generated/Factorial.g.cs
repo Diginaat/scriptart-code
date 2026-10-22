@@ -9,7 +9,7 @@ namespace Functions;
 
 internal static partial class Program
 {
-    private static int Factorial(int n)
+    public static int Factorial(int n)
     {
         if (n <= 1)
         {

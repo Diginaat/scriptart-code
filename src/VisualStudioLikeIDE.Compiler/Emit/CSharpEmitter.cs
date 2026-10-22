@@ -23,16 +23,25 @@ internal static class CSharpEmitter
         MemberDeclarationSyntax[] members = [
             .. EmitConstructor(irClass),
             .. irClass.Properties.Select(property => EmitProperty(property, usings)),
-            .. irClass.Methods.Select(method => EmitMethod(method, usings))];
+            .. irClass.Methods.Select(method => EmitMethod(method, irClass.Name, usings))];
 
         TypeDeclarationSyntax typeDeclaration = irClass.Kind switch
         {
-            IrClassKind.Class => ClassDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword)),
-            IrClassKind.Struct => StructDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.InternalKeyword)),
+            IrClassKind.Class => ClassDeclaration(irClass.Name).AddModifiers(irClass.IsPartial
+                ? [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword), Token(SyntaxKind.PartialKeyword)]
+                : [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword)]),
+            IrClassKind.Struct => StructDeclaration(irClass.Name).AddModifiers(irClass.IsPartial
+                ? [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.PartialKeyword)]
+                : [Token(SyntaxKind.InternalKeyword)]),
             _ => ClassDeclaration(irClass.Name).AddModifiers(irClass.IsPartial
                 ? [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.PartialKeyword)]
                 : [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword)]),
         };
+        if (irClass.TypeParameters.Count > 0)
+        {
+            typeDeclaration = typeDeclaration.WithTypeParameterList(TypeParameterList(SeparatedList(irClass.TypeParameters.Select(TypeParameter))));
+        }
+
         typeDeclaration = typeDeclaration.AddMembers(members);
 
         CompilationUnitSyntax unit = CompilationUnit()
@@ -43,11 +52,17 @@ internal static class CSharpEmitter
 
         // NormalizeWhitespace spreads a with-expression over several lines; a single property change reads better as one line.
         unit = unit.ReplaceNodes(unit.DescendantNodes().OfType<WithExpressionSyntax>(), (_, copy) => copy
-            .WithWithKeyword(copy.WithKeyword.WithTrailingTrivia(Space))
+            .WithExpression(copy.Expression.WithoutTrailingTrivia())
+            .WithWithKeyword(copy.WithKeyword.WithLeadingTrivia(Space).WithTrailingTrivia(Space))
             .WithInitializer(copy.Initializer
                 .WithOpenBraceToken(Token(SyntaxKind.OpenBraceToken).WithTrailingTrivia(Space))
                 .WithExpressions(SeparatedList(copy.Initializer.Expressions.Select(expression => expression.WithoutLeadingTrivia().WithoutTrailingTrivia())))
                 .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken).WithLeadingTrivia(Space).WithTrailingTrivia(copy.Initializer.CloseBraceToken.TrailingTrivia))));
+
+        // NormalizeWhitespace writes default! as "default !".
+        unit = unit.ReplaceNodes(
+            unit.DescendantNodes().OfType<PostfixUnaryExpressionSyntax>().Where(node => node.IsKind(SyntaxKind.SuppressNullableWarningExpression)),
+            (_, copy) => copy.WithOperand(copy.Operand.WithoutTrailingTrivia()));
 
         // NormalizeWhitespace puts the first type directly under a file-scoped namespace; separate them like hand-written code.
         TypeDeclarationSyntax normalizedClass = unit.DescendantNodes().OfType<TypeDeclarationSyntax>().First();
@@ -65,12 +80,9 @@ internal static class CSharpEmitter
         "// </auto-generated>" + EndOfLineText + EndOfLineText +
         "#nullable enable" + EndOfLineText + EndOfLineText);
 
-    /// <summary>
-    /// A struct whose properties have initializers needs a parameterless constructor (CS8983), which also makes <c>new T()</c>
-    /// run the initializers.
-    /// </summary>
+    /// <summary>The empty parameterless constructor that <see cref="IrClass.DefaultConstructor"/> asks for.</summary>
     private static IEnumerable<MemberDeclarationSyntax> EmitConstructor(IrClass irClass) =>
-        irClass.Kind == IrClassKind.Struct && irClass.Properties.Any(property => property.Initializer is not null)
+        irClass.DefaultConstructor
             ? [ConstructorDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.PublicKeyword)).WithBody(Block())]
             : [];
 
@@ -86,12 +98,29 @@ internal static class CSharpEmitter
             : syntax.WithInitializer(EqualsValueClause(EmitExpression(property.Initializer, usings))).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
-    private static MethodDeclarationSyntax EmitMethod(IrMethod method, SortedSet<string> usings) =>
-        MethodDeclaration(TypeSyntaxFor(method.ReturnType, usings), method.Name)
-            .AddModifiers(Token(method.IsPrivate ? SyntaxKind.PrivateKeyword : SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
-            .AddParameterListParameters([.. method.Parameters.Select(parameter =>
-                Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings)))])
+    private static BaseMethodDeclarationSyntax EmitMethod(IrMethod method, string className, SortedSet<string> usings)
+    {
+        ParameterSyntax[] parameters = [.. method.Parameters.Select(parameter => Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings)))];
+        if (method.IsConstructor)
+        {
+            return ConstructorDeclaration(className).AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddParameterListParameters(parameters)
+                .WithBody(EmitBlock(method.Body, usings));
+        }
+
+        // An async method returns a task of the value its Return Value nodes give back.
+        TypeRef returnType = !method.IsAsync ? method.ReturnType
+            : method.ReturnType == TypeRef.Void ? TypeRef.Task
+            : TypeRef.Task with { Arguments = [method.ReturnType] };
+        SyntaxToken[] modifiers = [
+            Token(SyntaxKind.PublicKeyword),
+            .. method.IsStatic ? [Token(SyntaxKind.StaticKeyword)] : Array.Empty<SyntaxToken>(),
+            .. method.IsAsync ? [Token(SyntaxKind.AsyncKeyword)] : Array.Empty<SyntaxToken>()];
+        return MethodDeclaration(TypeSyntaxFor(returnType, usings), method.Name)
+            .AddModifiers(modifiers)
+            .AddParameterListParameters(parameters)
             .WithBody(EmitBlock(method.Body, usings));
+    }
 
     private static BlockSyntax EmitBlock(IrBlock block, SortedSet<string> usings) =>
         Block(block.Statements.Select(statement => EmitStatement(statement, usings)));
@@ -112,8 +141,9 @@ internal static class CSharpEmitter
             IrFor loop => EmitFor(loop, usings),
             IrBreak => BreakStatement(),
             IrContinue => ContinueStatement(),
-            IrThrow thrown => ThrowStatement(ObjectCreationExpression(TypeSyntaxFor(TypeRef.InvalidOperationException, usings))
+            IrThrow thrown => ThrowStatement(ObjectCreationExpression(TypeSyntaxFor(thrown.ExceptionType, usings))
                 .WithArgumentList(Arguments([thrown.Message], usings))),
+            IrRethrow => ThrowStatement(),
             IrTry attempt => EmitTry(attempt, usings),
             IrForEach loop => ForEachStatement(TypeSyntaxFor(loop.Item.Type, usings), loop.Item.Name, EmitExpression(loop.Collection, usings), EmitBlock(loop.Body, usings)),
             IrElementAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
@@ -146,7 +176,7 @@ internal static class CSharpEmitter
 
     private static TryStatementSyntax EmitTry(IrTry attempt, SortedSet<string> usings)
     {
-        CatchDeclarationSyntax declaration = CatchDeclaration(TypeSyntaxFor(TypeRef.Exception, usings));
+        CatchDeclarationSyntax declaration = CatchDeclaration(TypeSyntaxFor(attempt.ExceptionType, usings));
         if (attempt.Exception is { } exception)
         {
             declaration = declaration.WithIdentifier(Identifier(exception.Name));
@@ -175,25 +205,29 @@ internal static class CSharpEmitter
     {
         IrLiteral literal => EmitLiteral(literal.Value),
         IrLocalReference local => IdentifierName(local.Local.Name),
+        IrThis => ThisExpression(),
+        IrTypeReference reference => TypeSyntaxFor(reference.Type, usings),
         IrBinary binary => EmitBinary(binary, usings),
         IrUnary unary => PrefixUnaryExpression(
             unary.Operator == IrUnaryOperator.LogicalNot ? SyntaxKind.LogicalNotExpression : SyntaxKind.UnaryMinusExpression,
             Operand(unary.Operand, Precedence.Unary, usings, avoidUnaryMinus: unary.Operator == IrUnaryOperator.Negate)),
         IrConvert convert => EmitConvert(convert, usings),
         IrStaticCall call => InvocationExpression(
-            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, TypeSyntaxFor(call.DeclaringType, usings), IdentifierName(call.MethodName)),
+            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, TypeSyntaxFor(call.DeclaringType, usings), MethodName(call.MethodName, call.TypeArguments, usings)),
             Arguments(call.Arguments, usings)),
         IrCall call => InvocationExpression(IdentifierName(call.MethodName), Arguments(call.Arguments, usings)),
         IrInstanceCall call => InvocationExpression(
-            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(call.Receiver, Precedence.Primary, usings), IdentifierName(call.MethodName)),
+            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(call.Receiver, Precedence.Primary, usings), MethodName(call.MethodName, call.TypeArguments, usings)),
             Arguments(call.Arguments, usings)),
         IrObjectCreation creation => ObjectCreationExpression(TypeSyntaxFor(creation.Type, usings)).WithArgumentList(Arguments(creation.Arguments, usings)),
         IrElementAccess element => EmitElementAccess(element.Receiver, element.Index, usings),
         IrMemberAccess access => MemberAccessExpression(
             SyntaxKind.SimpleMemberAccessExpression, Operand(access.Receiver, Precedence.Primary, usings), IdentifierName(access.MemberName)),
-        IrWith copy => WithExpression(Operand(copy.Receiver, Precedence.Primary, usings), InitializerExpression(
+        IrWith copy => WithExpression(Operand(copy.Receiver, Precedence.With, usings), InitializerExpression(
             SyntaxKind.WithInitializerExpression,
             [AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(copy.MemberName), EmitExpression(copy.Value, usings))])),
+        IrDefault => PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.DefaultLiteralExpression)),
+        IrAwait wait => AwaitExpression(Operand(wait.Operand, Precedence.Unary, usings)),
         IrError => throw new InvalidOperationException("IR containing errors must not be emitted."),
         _ => throw new NotSupportedException($"Unsupported IR expression {expression.GetType().Name}."),
     };
@@ -207,6 +241,11 @@ internal static class CSharpEmitter
 
         return CastExpression(TypeSyntaxFor(convert.Type, usings), Operand(convert.Operand, Precedence.Unary, usings, avoidUnaryMinus: false));
     }
+
+    private static SimpleNameSyntax MethodName(string name, IReadOnlyList<TypeRef>? typeArguments, SortedSet<string> usings) =>
+        typeArguments is { Count: > 0 }
+            ? GenericName(Identifier(name), TypeArgumentList(SeparatedList(typeArguments.Select(argument => TypeSyntaxFor(argument, usings)))))
+            : IdentifierName(name);
 
     private static ArgumentListSyntax Arguments(IReadOnlyList<IrExpression> arguments, SortedSet<string> usings) =>
         ArgumentList(SeparatedList(arguments.Select(argument => Argument(EmitExpression(argument, usings)))));
@@ -259,7 +298,7 @@ internal static class CSharpEmitter
         IrBinary { Operator: IrBinaryOperator.LogicalOr } => Precedence.LogicalOr,
         IrBinary { Operator: IrBinaryOperator.Coalesce } => Precedence.Coalesce,
         IrWith => Precedence.With,
-        IrUnary or IrConvert => Precedence.Unary,
+        IrUnary or IrConvert or IrAwait => Precedence.Unary,
         IrLiteral { Value: int and < 0 } or IrLiteral { Value: double and < 0 } => Precedence.Unary,
         _ => Precedence.Primary,
     };
@@ -302,13 +341,14 @@ internal static class CSharpEmitter
             case "string": return PredefinedType(Token(SyntaxKind.StringKeyword));
         }
 
-        if (!type.IsProjectType)
+        // Project types and type parameters are in the generated namespace or type, and need no using directive.
+        if (type.Namespace.Length > 0)
         {
             usings.Add(type.Namespace);
         }
 
-        return type.ElementType is { } element
-            ? GenericName(Identifier(type.Name), TypeArgumentList([TypeSyntaxFor(element, usings)]))
+        return type.Arguments.Count > 0
+            ? GenericName(Identifier(type.Name), TypeArgumentList(SeparatedList(type.Arguments.Select(argument => TypeSyntaxFor(argument, usings)))))
             : IdentifierName(type.Name);
     }
 

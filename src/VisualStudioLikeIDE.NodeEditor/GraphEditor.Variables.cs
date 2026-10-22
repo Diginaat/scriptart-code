@@ -132,5 +132,5 @@ public sealed partial class GraphEditor
         Graph.FindVariable(variableId) ?? throw new ArgumentException($"Unknown variable '{variableId}'.", nameof(variableId));
 
     private static string DefaultValue(TypeRef type) =>
-        type == TypeRef.Boolean ? "false" : type == TypeRef.String || type.IsList || type.IsProjectType ? "" : "0";
+        type == TypeRef.Boolean ? "false" : type == TypeRef.String || type.IsList || type.IsDictionary || type.IsProjectType ? "" : "0";
 }

@@ -40,15 +40,18 @@ public enum IrUnaryOperator
 
 public sealed record IrUnary(IrUnaryOperator Operator, IrExpression Operand, TypeRef Type) : IrExpression(Type);
 
-/// <summary>A call to a static method, for example <c>Console.WriteLine(value)</c>.</summary>
-public sealed record IrStaticCall(TypeRef DeclaringType, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type)
+/// <summary>
+/// A call to a static method, for example <c>Console.WriteLine(value)</c>. <paramref name="TypeArguments"/> are written for a generic
+/// method: <c>Enumerable.First&lt;int&gt;(list)</c>.
+/// </summary>
+public sealed record IrStaticCall(TypeRef DeclaringType, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type, IReadOnlyList<TypeRef>? TypeArguments = null)
     : IrExpression(Type);
 
 /// <summary>A call to another method of the generated class, for example <c>Square(value)</c>.</summary>
 public sealed record IrCall(string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type) : IrExpression(Type);
 
-/// <summary>A call to an instance method, for example <c>value.ToString()</c>.</summary>
-public sealed record IrInstanceCall(IrExpression Receiver, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type)
+/// <summary>A call to an instance method, for example <c>value.ToString()</c>. <paramref name="TypeArguments"/> are written for a generic method.</summary>
+public sealed record IrInstanceCall(IrExpression Receiver, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type, IReadOnlyList<TypeRef>? TypeArguments = null)
     : IrExpression(Type);
 
 /// <summary>Creates an object: <c>new List&lt;int&gt;()</c>.</summary>
@@ -73,3 +76,18 @@ public sealed record IrError(TypeRef Type) : IrExpression(Type);
 
 /// <summary>A local variable. Names are unique within their method.</summary>
 public sealed record IrLocal(string Name, TypeRef Type);
+
+/// <summary>The object or value whose method is running: <c>this</c>.</summary>
+public sealed record IrThis(TypeRef Type) : IrExpression(Type);
+
+/// <summary>
+/// The default value of a type parameter: <c>default!</c>. It stands for a value that is set before it is read, so the nullable
+/// warning is suppressed.
+/// </summary>
+public sealed record IrDefault(TypeRef Type) : IrExpression(Type);
+
+/// <summary>Waits for an asynchronous call to finish: <c>await operand</c>. <see cref="IrExpression.Type"/> is the result type, <c>void</c> for a <c>Task</c>.</summary>
+public sealed record IrAwait(IrExpression Operand, TypeRef Type) : IrExpression(Type);
+
+/// <summary>A type used as the receiver of a static member: <c>DateTime</c> in <c>DateTime.Now</c>.</summary>
+public sealed record IrTypeReference(TypeRef Type) : IrExpression(Type);

@@ -47,7 +47,7 @@ public sealed class FunctionTests
     }
 
     [Fact]
-    public void FunctionBecomesAPrivateMethodOfTheProgramClassAndCallsUseItsResult()
+    public void FunctionBecomesAStaticMethodOfTheProgramClassAndCallsUseItsResult()
     {
         GraphBuilder square = Square();
         var program = new GraphBuilder();
@@ -75,7 +75,7 @@ public sealed class FunctionTests
         Assert.Equal("""
             internal static partial class Program
             {
-                private static int Square(int value)
+                public static int Square(int value)
                 {
                     return value * value;
                 }
@@ -108,7 +108,7 @@ public sealed class FunctionTests
         string[] sources = CompileProject(program, square, greet);
 
         Assert.Contains("        Greet(\"Ada\");\n        Square(3);\n", sources[0], StringComparison.Ordinal);
-        Assert.Contains("    private static void Greet(string name)\n    {\n        Console.WriteLine(\"Hello, \" + name);\n    }", sources[2], StringComparison.Ordinal);
+        Assert.Contains("    public static void Greet(string name)\n    {\n        Console.WriteLine(\"Hello, \" + name);\n    }", sources[2], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class FunctionTests
         Assert.Equal("""
             internal static partial class Program
             {
-                private static int Factorial(int n)
+                public static int Factorial(int n)
                 {
                     if (n <= 1)
                     {

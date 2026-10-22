@@ -129,7 +129,7 @@
           <TextBox x:Name="InlineEditor" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top"
                    MinHeight="0" Padding="6,2" FontSize="13" TextWrapping="Wrap" NewLine="&#10;" />
           <!-- Action menu: opened by right-clicking empty space or releasing a wire there. Nodes are grouped by category. -->
-          <Border x:Name="ActionMenu" IsVisible="False" Width="360" Height="420" HorizontalAlignment="Left" VerticalAlignment="Top"
+          <Border x:Name="ActionMenu" IsVisible="False" Width="380" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top"
                   Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
                   CornerRadius="6" Padding="0,6,0,4" BoxShadow="0 6 18 0 #80000000">
             <DockPanel>
@@ -138,7 +138,10 @@
                           ToolTip.Tip="Show only nodes that fit here: from a wire or a selected node, nodes that can connect to it" />
                 <TextBlock x:Name="ActionMenuTitle" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               </DockPanel>
-              <TextBox x:Name="ActionSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search" />
+              <TextBox x:Name="ActionSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search: a name, a word like print or if, or what it does" />
+              <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,6,10,2" MinHeight="64">
+                <TextBlock x:Name="ActionDescription" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
+              </Border>
               <TreeView x:Name="ActionTree" Background="Transparent" />
             </DockPanel>
           </Border>

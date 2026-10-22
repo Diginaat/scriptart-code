@@ -73,6 +73,9 @@ The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 | My Project panel | Lists the graphs, functions, classes, structs, and the open graph's variables in collapsible sections, each with a **+** button; **+ Add New** offers all of them. Click a graph to open it |
 | Variables | **+** next to Variables; select a variable to edit its name, type, and initial value in Details. Drag it onto the graph for a Get (hold Ctrl) or Set (hold Alt) node, or pick one from the menu |
 | Classes and structs | **+** next to Classes or Structs; add properties in Details. New, Get, and Set (class) or With (struct) nodes appear under Types |
+| Methods | **Add Method** in a class's or struct's Details; use its **Self** node inside the method and its Call node, with a Target, elsewhere |
+| Lists and dictionaries | Choose a type such as `List<Point>` or `Dictionary<string, int>` for a variable, parameter, or property; its nodes appear under Lists or Dictionaries |
+| Constructors and generic types | **Add Constructor** in a class's or struct's Details, then choose it on a New node; **Type parameters** (such as `T`) make the type generic |
 | Command palette | Ctrl+Shift+P: search every menu command and node by name; Enter runs the first match |
 | Frame graph | Home |
 | Frame time | View → Frame Statistics shows how long the canvas takes to draw |
@@ -95,7 +98,7 @@ src/
   VisualStudioLikeIDE.App            Avalonia desktop IDE
   VisualStudioLikeIDE.Cli            headless generate/build/run
 tests/                               unit, integration (real dotnet builds), performance harness
-samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types
+samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, Methods
 docs/                                architecture, compiler pipeline, formats, decisions, roadmap
 ```
 

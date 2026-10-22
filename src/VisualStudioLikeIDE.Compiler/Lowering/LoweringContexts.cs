@@ -32,6 +32,12 @@ public class ExpressionLoweringContext
     /// <summary>The return type of the method being generated; <see cref="TypeSystem.TypeRef.Void"/> for the entry point.</summary>
     public TypeSystem.TypeRef ReturnType => Lowerer.ReturnType;
 
+    /// <summary>The program class, when the graph is a method of a class or struct and a function call must name it; otherwise null.</summary>
+    public TypeSystem.TypeRef? FunctionHost => Lowerer.FunctionHost;
+
+    /// <summary>True when the function, method, or constructor graph <paramref name="graphId"/> generates an async method that callers await.</summary>
+    public bool IsAsync(string graphId) => Lowerer.AsyncGraphs.Contains(graphId);
+
     /// <summary>The raw text of a property, or its default value when the node does not set it.</summary>
     public string Property(string propertyId)
     {
@@ -126,6 +132,9 @@ public sealed class StatementLoweringContext : ExpressionLoweringContext
 
     /// <summary>True while lowering a Finally block, which Return cannot leave.</summary>
     public bool IsInFinally => Lowerer.IsInFinally;
+
+    /// <summary>True while lowering a Catch block, where Rethrow is allowed.</summary>
+    public bool IsInCatch => Lowerer.IsInCatch;
 
     /// <summary>Reports an error on this node. The graph then generates no code.</summary>
     public void ReportError(string diagnosticId, string message) => Lowerer.ReportError(Node, diagnosticId, message);

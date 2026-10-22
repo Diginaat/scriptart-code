@@ -47,10 +47,19 @@ public static class GraphSerializer
             root["properties"] = new JsonArray();
         }
 
+        // Version 7 added an optional owner to function graphs; older functions belong to the program class, which an absent
+        // owner means, so there is nothing to convert.
+
+        if (version < 8)
+        {
+            // Version 8 added constructor graphs, which are new files, and type parameters, which older types do not have.
+            root["typeParameters"] = new JsonArray();
+        }
+
         root["schemaVersion"] = GraphDocument.CurrentSchemaVersion;
 
         // An absent list means an empty one. Without this, the generated deserializer would set the list to null.
-        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters", "properties"])
+        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters", "properties", "typeParameters"])
         {
             root[list] ??= new JsonArray();
         }

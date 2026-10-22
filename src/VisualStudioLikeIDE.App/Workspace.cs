@@ -72,7 +72,7 @@ internal sealed class Workspace
             return false;
         }
 
-        Compiler.Library.RegisterExternalMethods(ExternalApi.FromAssemblies(added));
+        Compiler.Library.RegisterExternal(ExternalApi.FromAssemblies(added));
         loadedReferences.UnionWith(added);
         return true;
     }
@@ -91,6 +91,53 @@ internal sealed class Workspace
 
     /// <summary>Adds a class or struct graph with an unused name such as <c>Class1</c> and opens it.</summary>
     public ProjectGraph AddType(GraphKind kind) => Add(Project.AddType(UnusedName(kind.ToString()), kind));
+
+    /// <summary>Adds a method with an unused name such as <c>Method1</c> to the class or struct <paramref name="owner"/> and opens it.</summary>
+    public ProjectGraph AddMethod(ProjectGraph owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        return Add(Project.AddMethod(owner.Graph, UnusedName("Method")));
+    }
+
+    /// <summary>Adds a constructor with an unused name such as <c>Constructor1</c> to the class or struct <paramref name="owner"/> and opens it.</summary>
+    public ProjectGraph AddConstructor(ProjectGraph owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        return Add(Project.AddConstructor(owner.Graph, UnusedName("Constructor")));
+    }
+
+    /// <summary>Renames <paramref name="graph"/> as one step of its own undo history. Its file follows the name on the next save.</summary>
+    public void RenameGraph(ProjectGraph graph, string name)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        EditorFor(graph).RenameGraph(name);
+    }
+
+    /// <summary>
+    /// Removes <paramref name="graph"/>, and the methods and constructors of a class or struct, from the project; their files are
+    /// deleted by the next save. Opens the program graph when the open graph was removed. This cannot be undone.
+    /// </summary>
+    public IReadOnlyList<ProjectGraph> RemoveGraph(ProjectGraph graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+        IReadOnlyList<ProjectGraph> removed = Project.RemoveGraph(graph.Graph);
+        foreach (ProjectGraph item in removed)
+        {
+            editors.Remove(item.Graph);
+        }
+
+        projectChanged = true;
+        IReadOnlyList<GraphDocument> graphs = Project.GraphDocuments;
+        foreach (GraphEditor editor in editors.Values)
+        {
+            editor.ProjectGraphs = graphs;
+        }
+
+        OpenGraph(removed.Any(item => item.Graph == Graph.Graph)
+            ? Project.Graphs.First(item => item.Graph.Kind == GraphKind.EntryPoint)
+            : Project.Graphs.First(item => item.Graph == Graph.Graph));
+        return removed;
+    }
 
     private ProjectGraph Add(ProjectGraph added)
     {
@@ -123,6 +170,9 @@ internal sealed class Workspace
     {
         Project.Save();
         projectChanged = false;
+
+        // Saving moves renamed graphs to new files, which replaces their project entries.
+        Graph = Project.Graphs.First(graph => graph.Graph == Graph.Graph);
         foreach (GraphEditor editor in editors.Values)
         {
             editor.MarkSaved();

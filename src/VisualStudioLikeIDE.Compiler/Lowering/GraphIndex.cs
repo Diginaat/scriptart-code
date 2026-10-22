@@ -1,5 +1,6 @@
 using VisualStudioLikeIDE.Compiler.Diagnostics;
 using VisualStudioLikeIDE.Compiler.Nodes;
+using VisualStudioLikeIDE.Compiler.TypeSystem;
 using VisualStudioLikeIDE.GraphModel;
 
 namespace VisualStudioLikeIDE.Compiler.Lowering;
@@ -113,8 +114,10 @@ public sealed class GraphIndex
 
         if (definition is null && node.Type is FunctionNodes.EntryTypeId or FunctionNodes.ReturnTypeId or FunctionNodes.CallTypeId)
         {
+            string? called = node.Properties.GetValueOrDefault(FunctionNodes.FunctionProperty);
             diagnostics.Add(new(DiagnosticIds.UnknownFunction, DiagnosticSeverity.Error, node.Type == FunctionNodes.CallTypeId
-                ? "This node calls a function that is no longer in the project, or whose signature uses an unsupported type."
+                ? TypeArgumentProblem(node, ProjectGraphs.FirstOrDefault(graph => graph.Id == called)?.Owner)
+                    ?? "This node calls a function that is no longer in the project, or whose signature uses an unsupported type."
                 : "This node only belongs in a function graph, and Return Value only in a function that returns a value.", Graph.Id, node.Id));
             return;
         }
@@ -122,7 +125,22 @@ public sealed class GraphIndex
         if (definition is null && TypeNodes.IsTypeNode(node.Type))
         {
             diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
-                "This node refers to a class, struct, or property that is no longer in the project, or whose type is not supported.", Graph.Id, node.Id));
+                TypeArgumentProblem(node, node.Properties.GetValueOrDefault(TypeNodes.TypeProperty))
+                    ?? "This node refers to a class, struct, or property that is no longer in the project, or whose type is not supported.", Graph.Id, node.Id));
+            return;
+        }
+
+        if (definition is null && CollectionNodes.IsGeneratedNode(node.Type))
+        {
+            diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
+                "This node works on a list or dictionary type that is not supported, or whose class or struct is no longer in the project.", Graph.Id, node.Id));
+            return;
+        }
+
+        if (definition is null && library.IsGenericMethod(node.Type))
+        {
+            diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
+                "This node's Type Arguments are not types the method can use. Write one type per type parameter, such as int.", Graph.Id, node.Id));
             return;
         }
 
@@ -191,6 +209,19 @@ public sealed class GraphIndex
 
         Add(byOutput, connection.From, connection);
         Add(byInput, connection.To, connection);
+    }
+
+    // A node of a generic class or struct, or a call of one of its methods, names one type argument per type parameter.
+    private string? TypeArgumentProblem(GraphNode node, string? typeGraphId)
+    {
+        if (ProjectGraphs.FirstOrDefault(graph => graph.Id == typeGraphId) is not { TypeParameters.Count: > 0 } type
+            || TypeRef.ArgumentsFromNames(node.Properties.GetValueOrDefault(TypeNodes.TypeArgumentsProperty), ProjectGraphs, Graph)?.Count == type.TypeParameters.Count)
+        {
+            return null;
+        }
+
+        return $"{type.Name} is generic, and this node does not give a valid type argument for each of {string.Join(", ", type.TypeParameters)}. "
+            + $"Replace it with the node for a {type.Name}<…> type from the palette.";
     }
 
     private PinDefinition? FindPin(PinRef pin) => nodes.GetValueOrDefault(pin.Node)?.Definition.FindPin(pin.Pin);

@@ -25,6 +25,27 @@ public sealed partial class GraphEditor
         return added;
     }
 
+    /// <summary>
+    /// Replaces the type parameters of a generic class or struct, such as <c>T</c>. Invalid or duplicate names are stored and
+    /// reported by the compiler.
+    /// </summary>
+    public void SetTypeParameters(IReadOnlyList<string> typeParameters)
+    {
+        ArgumentNullException.ThrowIfNull(typeParameters);
+        string[] old = [.. Graph.TypeParameters];
+        string[] updated = [.. typeParameters];
+        if (!old.SequenceEqual(updated, StringComparer.Ordinal))
+        {
+            Execute(new Edit("Change type parameters", () => Replace(updated), () => Replace(old)));
+        }
+
+        void Replace(string[] names)
+        {
+            Graph.TypeParameters.Clear();
+            Graph.TypeParameters.AddRange(names);
+        }
+    }
+
     /// <summary>Renames a property. Invalid names are stored and reported by the compiler.</summary>
     public void RenameProperty(string propertyId, string name)
     {

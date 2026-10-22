@@ -34,22 +34,36 @@ internal sealed class MethodLowerer
     // The statement being lowered: where shared pure values are declared, and how often each pure node feeds it.
     private (string NodeId, IrBlock Block, Dictionary<string, int> Uses, Dictionary<string, IrLocal> Hoisted)? statement;
 
-    private MethodLowerer(GraphIndex index, ExecutionFlow flow, List<GraphDiagnostic> diagnostics, TypeSystem.TypeRef returnType)
+    private MethodLowerer(GraphIndex index, ExecutionFlow flow, List<GraphDiagnostic> diagnostics, TypeSystem.TypeRef returnType, TypeSystem.TypeRef? functionHost, IReadOnlySet<string> asyncGraphs)
     {
         this.index = index;
         this.flow = flow;
         this.diagnostics = diagnostics;
         ReturnType = returnType;
+        FunctionHost = functionHost;
+        AsyncGraphs = asyncGraphs;
     }
 
+    /// <summary>The ids of the project's graphs that generate async methods, which callers await.</summary>
+    internal IReadOnlySet<string> AsyncGraphs { get; }
+
     internal TypeSystem.TypeRef ReturnType { get; }
+
+    /// <summary>The program class, when the graph is a method of another type and calls to functions must name it; otherwise null.</summary>
+    internal TypeSystem.TypeRef? FunctionHost { get; }
 
     private string GraphId => index.Graph.Id;
 
     /// <summary>
     /// Lowers everything reachable from <paramref name="entry"/>. Returns null when the execution flow cannot be analyzed.
     /// </summary>
-    internal static IrBlock? LowerBody(GraphIndex index, ResolvedNode entry, List<GraphDiagnostic> diagnostics, TypeSystem.TypeRef returnType)
+    internal static IrBlock? LowerBody(
+        GraphIndex index,
+        ResolvedNode entry,
+        List<GraphDiagnostic> diagnostics,
+        TypeSystem.TypeRef returnType,
+        TypeSystem.TypeRef? functionHost = null,
+        IReadOnlySet<string>? asyncGraphs = null)
     {
         ExecutionFlow? flow = ExecutionFlow.Analyze(index, entry, diagnostics);
         if (flow is null)
@@ -57,12 +71,12 @@ internal sealed class MethodLowerer
             return null;
         }
 
-        var lowerer = new MethodLowerer(index, flow, diagnostics, returnType);
+        var lowerer = new MethodLowerer(index, flow, diagnostics, returnType, functionHost, asyncGraphs ?? new HashSet<string>());
 
         // Parameter names come first: they are part of the method's signature and must not be renamed.
         foreach (GraphParameter parameter in index.Graph.Parameters)
         {
-            if (TypeSystem.TypeRef.FromName(parameter.Type, index.ProjectGraphs) is { } type)
+            if (TypeSystem.TypeRef.FromName(parameter.Type, index.ProjectGraphs, index.Graph) is { } type)
             {
                 lowerer.parameters.Add(parameter.Id, new IrLocal(lowerer.AllocateName(parameter.Name), type));
             }
@@ -78,7 +92,7 @@ internal sealed class MethodLowerer
     /// <summary>The parameters of the method in declaration order, as generated.</summary>
     internal static IReadOnlyList<IrParameter> Parameters(GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs) =>
         [.. graph.Parameters
-            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromName(parameter.Type, projectGraphs)))
+            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromName(parameter.Type, projectGraphs, graph)))
             .Where(parameter => parameter.Type is not null)
             .Select(parameter => new IrParameter(parameter.Name, parameter.Type!))];
 
@@ -106,7 +120,7 @@ internal sealed class MethodLowerer
         foreach (GraphVariable variable in index.Graph.Variables)
         {
             ResolvedNode? firstWriter = writers.FirstOrDefault(node => ((VariableSetNode)node.Definition).VariableId == variable.Id);
-            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromName(variable.Type, index.ProjectGraphs) is not { } type)
+            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromName(variable.Type, index.ProjectGraphs, index.Graph) is not { } type)
             {
                 continue;
             }
@@ -147,6 +161,9 @@ internal sealed class MethodLowerer
 
     /// <summary>True inside a Finally block, which control cannot leave with return.</summary>
     internal bool IsInFinally => blocks.Contains(NestedBlock.Finally);
+
+    /// <summary>True inside a Catch block that does not enclose the innermost Finally block, where <c>throw;</c> is allowed (CS0724).</summary>
+    internal bool IsInCatch => blocks.LastIndexOf(NestedBlock.Catch) > blocks.LastIndexOf(NestedBlock.Finally);
 
     /// <summary>
     /// Lowers the body of a loop node. <paramref name="loopValues"/> are the node's data outputs that only exist inside the body,

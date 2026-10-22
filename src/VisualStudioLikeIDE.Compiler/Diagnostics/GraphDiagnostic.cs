@@ -67,4 +67,5 @@ public static class DiagnosticIds
     public const string JumpOutOfFinally = "VSG0028";
     public const string UnknownType = "VSG0029";
     public const string InvalidType = "VSG0030";
+    public const string RethrowOutsideCatch = "VSG0031";
 }

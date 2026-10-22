@@ -41,4 +41,4 @@ Handwritten C# goes in ordinary `.cs` files anywhere in the project. It is part 
 
 ## Source map
 
-Every emitted statement is annotated with the ID of the node that produced it. After formatting, annotations are converted to line ranges (`GeneratedSource.SourceMap`). The IDE uses this to highlight a node's code when the node is selected, to select the node when the caret moves in generated code, and to attach Roslyn diagnostics to nodes. The same mapping is the basis for node breakpoints (Phase 4).
+Every emitted statement is annotated with the ID of the node that produced it. After formatting, annotations are converted to line ranges (`GeneratedSource.SourceMap`). The IDE uses this to highlight a node's code when the node is selected, to select the node when the caret moves in generated code, and to attach Roslyn diagnostics to nodes. The same mapping is the basis for node breakpoints (Phase 5).
