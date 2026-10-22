@@ -20,22 +20,37 @@ internal static class CSharpEmitter
     public static GeneratedSource Emit(IrClass irClass, string relativePath, string sourceDescription)
     {
         var usings = new SortedSet<string>(StringComparer.Ordinal);
-        MemberDeclarationSyntax[] methods = [.. irClass.Methods.Select(method => EmitMethod(method, usings))];
+        MemberDeclarationSyntax[] members = [
+            .. EmitConstructor(irClass),
+            .. irClass.Properties.Select(property => EmitProperty(property, usings)),
+            .. irClass.Methods.Select(method => EmitMethod(method, usings))];
 
-        ClassDeclarationSyntax classDeclaration = ClassDeclaration(irClass.Name)
-            .AddModifiers(irClass.IsPartial
+        TypeDeclarationSyntax typeDeclaration = irClass.Kind switch
+        {
+            IrClassKind.Class => ClassDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword)),
+            IrClassKind.Struct => StructDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.InternalKeyword)),
+            _ => ClassDeclaration(irClass.Name).AddModifiers(irClass.IsPartial
                 ? [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.PartialKeyword)]
-                : [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword)])
-            .AddMembers(methods);
+                : [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword)]),
+        };
+        typeDeclaration = typeDeclaration.AddMembers(members);
 
         CompilationUnitSyntax unit = CompilationUnit()
             .AddUsings([.. usings.Select(name => UsingDirective(ParseName(name)))])
-            .AddMembers(FileScopedNamespaceDeclaration(ParseName(irClass.Namespace)).AddMembers(classDeclaration));
+            .AddMembers(FileScopedNamespaceDeclaration(ParseName(irClass.Namespace)).AddMembers(typeDeclaration));
 
         unit = unit.NormalizeWhitespace(Indentation, EndOfLineText);
 
+        // NormalizeWhitespace spreads a with-expression over several lines; a single property change reads better as one line.
+        unit = unit.ReplaceNodes(unit.DescendantNodes().OfType<WithExpressionSyntax>(), (_, copy) => copy
+            .WithWithKeyword(copy.WithKeyword.WithTrailingTrivia(Space))
+            .WithInitializer(copy.Initializer
+                .WithOpenBraceToken(Token(SyntaxKind.OpenBraceToken).WithTrailingTrivia(Space))
+                .WithExpressions(SeparatedList(copy.Initializer.Expressions.Select(expression => expression.WithoutLeadingTrivia().WithoutTrailingTrivia())))
+                .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken).WithLeadingTrivia(Space).WithTrailingTrivia(copy.Initializer.CloseBraceToken.TrailingTrivia))));
+
         // NormalizeWhitespace puts the first type directly under a file-scoped namespace; separate them like hand-written code.
-        ClassDeclarationSyntax normalizedClass = unit.DescendantNodes().OfType<ClassDeclarationSyntax>().First();
+        TypeDeclarationSyntax normalizedClass = unit.DescendantNodes().OfType<TypeDeclarationSyntax>().First();
         unit = unit.ReplaceNode(normalizedClass, normalizedClass.WithLeadingTrivia(normalizedClass.GetLeadingTrivia().Insert(0, EndOfLine(EndOfLineText))));
         unit = unit.WithLeadingTrivia(FileHeader(sourceDescription).AddRange(unit.GetLeadingTrivia()));
 
@@ -49,6 +64,27 @@ internal static class CSharpEmitter
         "//     Changes to this file are overwritten when the graph is compiled." + EndOfLineText +
         "// </auto-generated>" + EndOfLineText + EndOfLineText +
         "#nullable enable" + EndOfLineText + EndOfLineText);
+
+    /// <summary>
+    /// A struct whose properties have initializers needs a parameterless constructor (CS8983), which also makes <c>new T()</c>
+    /// run the initializers.
+    /// </summary>
+    private static IEnumerable<MemberDeclarationSyntax> EmitConstructor(IrClass irClass) =>
+        irClass.Kind == IrClassKind.Struct && irClass.Properties.Any(property => property.Initializer is not null)
+            ? [ConstructorDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.PublicKeyword)).WithBody(Block())]
+            : [];
+
+    private static PropertyDeclarationSyntax EmitProperty(IrProperty property, SortedSet<string> usings)
+    {
+        PropertyDeclarationSyntax syntax = PropertyDeclaration(TypeSyntaxFor(property.Type, usings), property.Name)
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddAccessorListAccessors(
+                AccessorDeclaration(SyntaxKind.GetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+        return property.Initializer is null
+            ? syntax
+            : syntax.WithInitializer(EqualsValueClause(EmitExpression(property.Initializer, usings))).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+    }
 
     private static MethodDeclarationSyntax EmitMethod(IrMethod method, SortedSet<string> usings) =>
         MethodDeclaration(TypeSyntaxFor(method.ReturnType, usings), method.Name)
@@ -82,6 +118,9 @@ internal static class CSharpEmitter
             IrForEach loop => ForEachStatement(TypeSyntaxFor(loop.Item.Type, usings), loop.Item.Name, EmitExpression(loop.Collection, usings), EmitBlock(loop.Body, usings)),
             IrElementAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                 EmitElementAccess(assignment.Receiver, assignment.Index, usings), EmitExpression(assignment.Value, usings))),
+            IrMemberAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
+                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(assignment.Receiver, Precedence.Primary, usings), IdentifierName(assignment.MemberName)),
+                EmitExpression(assignment.Value, usings))),
             _ => throw new NotSupportedException($"Unsupported IR statement {statement.GetType().Name}."),
         };
 
@@ -152,6 +191,9 @@ internal static class CSharpEmitter
         IrElementAccess element => EmitElementAccess(element.Receiver, element.Index, usings),
         IrMemberAccess access => MemberAccessExpression(
             SyntaxKind.SimpleMemberAccessExpression, Operand(access.Receiver, Precedence.Primary, usings), IdentifierName(access.MemberName)),
+        IrWith copy => WithExpression(Operand(copy.Receiver, Precedence.Primary, usings), InitializerExpression(
+            SyntaxKind.WithInitializerExpression,
+            [AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(copy.MemberName), EmitExpression(copy.Value, usings))])),
         IrError => throw new InvalidOperationException("IR containing errors must not be emitted."),
         _ => throw new NotSupportedException($"Unsupported IR expression {expression.GetType().Name}."),
     };
@@ -216,6 +258,7 @@ internal static class CSharpEmitter
         IrBinary { Operator: IrBinaryOperator.LogicalAnd } => Precedence.LogicalAnd,
         IrBinary { Operator: IrBinaryOperator.LogicalOr } => Precedence.LogicalOr,
         IrBinary { Operator: IrBinaryOperator.Coalesce } => Precedence.Coalesce,
+        IrWith => Precedence.With,
         IrUnary or IrConvert => Precedence.Unary,
         IrLiteral { Value: int and < 0 } or IrLiteral { Value: double and < 0 } => Precedence.Unary,
         _ => Precedence.Primary,
@@ -259,7 +302,11 @@ internal static class CSharpEmitter
             case "string": return PredefinedType(Token(SyntaxKind.StringKeyword));
         }
 
-        usings.Add(type.Namespace);
+        if (!type.IsProjectType)
+        {
+            usings.Add(type.Namespace);
+        }
+
         return type.ElementType is { } element
             ? GenericName(Identifier(type.Name), TypeArgumentList([TypeSyntaxFor(element, usings)]))
             : IdentifierName(type.Name);
@@ -287,6 +334,7 @@ internal static class CSharpEmitter
         Relational,
         Additive,
         Multiplicative,
+        With,
         Unary,
         Primary,
     }

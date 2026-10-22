@@ -30,9 +30,13 @@ Done: lists and `foreach`. Variables, parameters, and return values can be `List
 
 Done: calling .NET methods. Methods of `Math`, `String`, `Convert`, `Environment`, `File`, `Path`, and `Thread`, and of every public type in a project's referenced assemblies and NuGet packages, appear in the palette under `.NET <Type>`; signatures graphs cannot express are filtered out (D-021).
 
-Next: classes, structs, and properties.
+Done: classes, structs, and properties (graph schema version 6). **+ Add → Class** or **Struct** in the Graphs list (or the File menu) adds a type graph whose properties, with their types and initial values, are edited in Details. A type can be used wherever a variable, parameter, return, or property type is chosen. Each type has a New node and a Get node per property in the Types category, plus a Set node per property for a class and a With node (a copy with one property changed) for a struct. Each type generates an `internal sealed class` or `internal struct` in its own `.g.cs` file (D-022). See the `Types` sample.
 
-Remaining: classes, structs, properties; dictionaries, nested and user-defined generic types; constructors, properties, and generic methods of .NET types; typed catch clauses and rethrow; async/await.
+Done: editor layout closer to established visual scripting editors (D-023). The left panel has a **My Project** tab (collapsible Graphs, Functions, Classes, Structs, and Variables sections with **+** buttons, **+ Add New**, and search) and a **Palette** tab. Right-clicking empty space opens the action menu: nodes grouped by category with search and a **Context Sensitive** toggle; releasing a wire on empty space opens the same menu. Variables are selected in My Project, edited in Details, and dragged onto the graph for Get (Ctrl) or Set (Alt) nodes.
+
+Next: dictionaries and lists of classes and structs.
+
+Remaining: dictionaries, lists of classes and structs, nested and user-defined generic types; methods and constructors on classes and structs; nested and user-defined generic types; constructors, properties, and generic methods of .NET types; typed catch clauses and rethrow; async/await.
 
 ## Phase 4 — Code quality and IDE integration
 
@@ -48,7 +52,8 @@ Installer, crash recovery and autosave, accessibility review, preferences, upgra
 
 ## Known limitations of the current build
 
-- Function graphs cannot be deleted or renamed on disk from the IDE yet; the file keeps its first name. Variables, parameters, and return types are limited to `bool`, `int`, `double`, `string`, and lists of them. Variables are method-wide.
+- Function, class, and struct graphs cannot be deleted or renamed on disk from the IDE yet; the file keeps its first name. Variables, parameters, return types, and properties are limited to `bool`, `int`, `double`, `string`, lists of them, and the project's classes and structs. Variables are method-wide.
+- Variables, parameters, and properties refer to a class or struct by name, so renaming the type leaves them reporting an unsupported type until they are changed to the new name.
 - Reroute points stay in place when the nodes they connect, or a comment around them, are moved.
 - Running programs receive input from the Output panel's input box; there is no interactive terminal.
 - The `.csproj` is created once; build settings are edited there directly.

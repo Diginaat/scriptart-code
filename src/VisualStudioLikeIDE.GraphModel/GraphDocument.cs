@@ -10,6 +10,12 @@ public enum GraphKind
 
     /// <summary>A method of the program class, with <see cref="GraphDocument.Parameters"/> and an optional return value.</summary>
     Function,
+
+    /// <summary>A class with the <see cref="GraphDocument.Properties"/> of the graph. Objects of it are shared by reference.</summary>
+    Class,
+
+    /// <summary>A struct with the <see cref="GraphDocument.Properties"/> of the graph. Values of it are copied.</summary>
+    Struct,
 }
 
 /// <summary>
@@ -19,9 +25,9 @@ public sealed class GraphDocument
 {
     /// <summary>
     /// Version 2 added <see cref="Comments"/>; version 3 added <see cref="GraphConnection.Points"/>; version 4 added <see cref="Variables"/>;
-    /// version 5 added <see cref="Parameters"/> and <see cref="ReturnType"/>.
+    /// version 5 added <see cref="Parameters"/> and <see cref="ReturnType"/>; version 6 added <see cref="Properties"/>.
     /// </summary>
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -46,14 +52,19 @@ public sealed class GraphDocument
     /// <summary>Parameters of a <see cref="GraphKind.Function"/> graph, in declaration order.</summary>
     public List<GraphParameter> Parameters { get; init; } = [];
 
-    /// <summary>C# keyword of a function's return type, or null when it returns nothing (<c>void</c>).</summary>
+    /// <summary>C# name of a function's return type, like <see cref="GraphVariable.Type"/>, or null when it returns nothing (<c>void</c>).</summary>
     public string? ReturnType { get; set; }
+
+    /// <summary>Properties of a <see cref="GraphKind.Class"/> or <see cref="GraphKind.Struct"/> graph, in declaration order.</summary>
+    public List<GraphProperty> Properties { get; init; } = [];
 
     public GraphNode? FindNode(string nodeId) => Nodes.Find(node => node.Id == nodeId);
 
     public GraphVariable? FindVariable(string variableId) => Variables.Find(variable => variable.Id == variableId);
 
     public GraphParameter? FindParameter(string parameterId) => Parameters.Find(parameter => parameter.Id == parameterId);
+
+    public GraphProperty? FindProperty(string propertyId) => Properties.Find(property => property.Id == propertyId);
 
     public GraphComment? FindComment(string commentId) => Comments.Find(comment => comment.Id == commentId);
 
@@ -114,7 +125,10 @@ public sealed class GraphVariable
     /// <summary>Name of the generated local. Must be a valid C# identifier, unique in the graph.</summary>
     public required string Name { get; set; }
 
-    /// <summary>C# keyword of the variable's type: <c>bool</c>, <c>int</c>, <c>double</c>, or <c>string</c>.</summary>
+    /// <summary>
+    /// C# name of the variable's type: <c>bool</c>, <c>int</c>, <c>double</c>, <c>string</c>, a list of one of them such as
+    /// <c>List&lt;int&gt;</c>, or the name of a class or struct of the project.
+    /// </summary>
     public required string Type { get; set; }
 
     /// <summary>Initial value, as literal text in the invariant culture.</summary>
@@ -131,8 +145,25 @@ public sealed class GraphParameter
     /// <summary>Name of the generated parameter. Must be a valid C# identifier, unique in the function.</summary>
     public required string Name { get; set; }
 
-    /// <summary>C# keyword of the parameter's type: <c>bool</c>, <c>int</c>, <c>double</c>, or <c>string</c>.</summary>
+    /// <summary>C# name of the parameter's type, like <see cref="GraphVariable.Type"/>.</summary>
     public required string Type { get; set; }
+}
+
+/// <summary>
+/// A property of a class or struct. Nodes refer to it by <see cref="Id"/>, so renaming it keeps every Get and Set node attached.
+/// </summary>
+public sealed class GraphProperty
+{
+    public required string Id { get; init; }
+
+    /// <summary>Name of the generated property. Must be a valid C# identifier, unique in the type.</summary>
+    public required string Name { get; set; }
+
+    /// <summary>C# name of the property's type, such as <c>int</c>, <c>List&lt;string&gt;</c>, or the name of a class or struct of the project.</summary>
+    public required string Type { get; set; }
+
+    /// <summary>Initial value, as literal text in the invariant culture; blank for lists, classes, and structs.</summary>
+    public string Value { get; set; } = "";
 }
 
 /// <summary>Identifies one pin on one node.</summary>

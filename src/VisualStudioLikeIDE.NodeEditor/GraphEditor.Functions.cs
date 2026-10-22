@@ -10,20 +10,21 @@ namespace VisualStudioLikeIDE.NodeEditor;
 /// </summary>
 public sealed partial class GraphEditor
 {
-    public void RenameFunction(string name)
+    /// <summary>Renames the graph: a function, class, or struct. Nodes that refer to it keep working because they store its id.</summary>
+    public void RenameGraph(string name)
     {
         ArgumentNullException.ThrowIfNull(name);
         string old = Graph.Name;
         if (old != name)
         {
-            Execute(new Edit("Rename function", () => Graph.Name = name, () => Graph.Name = old));
+            Execute(new Edit($"Rename {Graph.Kind.ToString().ToLowerInvariant()}", () => Graph.Name = name, () => Graph.Name = old));
         }
     }
 
     /// <summary>Adds a parameter of the given type (a C# keyword such as <c>int</c>) with a unique name.</summary>
     public GraphParameter AddParameter(string type)
     {
-        _ = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
+        _ = ResolveType(type, "parameter");
         string name = "value";
         for (int suffix = 2; Graph.Parameters.Exists(parameter => parameter.Name == name) || Graph.Variables.Exists(variable => variable.Name == name); suffix++)
         {
@@ -49,7 +50,7 @@ public sealed partial class GraphEditor
 
     public void SetParameterType(string parameterId, string type)
     {
-        _ = TypeRef.FromName(type) ?? throw new ArgumentException($"Unsupported parameter type '{type}'.", nameof(type));
+        _ = ResolveType(type, "parameter");
         GraphParameter parameter = FindParameter(parameterId);
         string old = parameter.Type;
         if (old != type)
@@ -73,9 +74,9 @@ public sealed partial class GraphEditor
     /// <summary>Sets the return type: a C# keyword such as <c>int</c>, or null for a function that returns nothing.</summary>
     public void SetReturnType(string? type)
     {
-        if (type is not null && TypeRef.FromName(type) is null)
+        if (type is not null)
         {
-            throw new ArgumentException($"Unsupported return type '{type}'.", nameof(type));
+            _ = ResolveType(type, "return");
         }
 
         string? old = Graph.ReturnType;

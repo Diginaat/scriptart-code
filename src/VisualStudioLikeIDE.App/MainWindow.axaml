@@ -16,6 +16,8 @@
           <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
           <Separator />
           <MenuItem x:Name="AddFunctionMenuItem" Header="Add _Function" Click="OnAddFunction" />
+          <MenuItem x:Name="AddClassMenuItem" Header="Add _Class" Click="OnAddClass" />
+          <MenuItem x:Name="AddStructMenuItem" Header="Add St_ruct" Click="OnAddStruct" />
           <Separator />
           <MenuItem Header="E_xit" Click="OnExit" />
         </MenuItem>
@@ -81,39 +83,63 @@
       </Border>
 
       <Grid ColumnDefinitions="250,4,*,4,300" RowDefinitions="*,4,250">
-        <!-- Node palette -->
+        <!-- Left panel: My Project (the project's graphs, types, and the open graph's variables) and the node palette. -->
         <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,0,0">
-          <DockPanel>
-            <!-- Graphs: the entry graph and the function graphs; selecting one opens it. -->
-            <DockPanel DockPanel.Dock="Top">
-              <Button x:Name="AddFunctionButton" DockPanel.Dock="Right" Classes="toolbar" Content="+ Function" Margin="0,4,6,0"
-                      ToolTip.Tip="Add a function graph to the project" Click="OnAddFunction" />
-              <TextBlock Classes="panelTitle" Text="GRAPHS" />
-            </DockPanel>
-            <ListBox x:Name="GraphList" DockPanel.Dock="Top" Classes="palette" Background="Transparent" MaxHeight="180" Margin="0,0,0,6" />
-            <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="NODES" />
-            <TextBox x:Name="PaletteSearch" DockPanel.Dock="Top" Margin="8,0,8,6" PlaceholderText="Search nodes" />
-            <TextBlock DockPanel.Dock="Bottom" Classes="secondary" FontSize="11" Margin="10,6" TextWrapping="Wrap"
-                       Text="Drag a node onto the graph, or double-click or press Enter to add it at the center of the view." />
-            <ListBox x:Name="PaletteList" Classes="palette" Background="Transparent" />
-          </DockPanel>
+          <TabControl x:Name="LeftTabs" Classes="bottom" Padding="0">
+            <TabItem Header="My Project">
+              <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="6,6,6,4">
+                  <Button x:Name="AddNewButton" DockPanel.Dock="Left" Content="+ Add New" Margin="0,0,6,0"
+                          ToolTip.Tip="Add a variable, function, class, or struct">
+                    <Button.Flyout>
+                      <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                        <MenuItem Header="Variable" Click="OnAddVariable" />
+                        <MenuItem Header="Function" Click="OnAddFunction" />
+                        <MenuItem Header="Class" Click="OnAddClass" />
+                        <MenuItem Header="Struct" Click="OnAddStruct" />
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                  <TextBox x:Name="ProjectSearch" PlaceholderText="Search" />
+                </DockPanel>
+                <ScrollViewer>
+                  <StackPanel x:Name="ProjectPanel" Margin="0,0,0,8" />
+                </ScrollViewer>
+              </DockPanel>
+            </TabItem>
+            <TabItem Header="Palette">
+              <DockPanel>
+                <TextBox x:Name="PaletteSearch" DockPanel.Dock="Top" Margin="8,6,8,6" PlaceholderText="Search nodes" />
+                <TextBlock DockPanel.Dock="Bottom" Classes="secondary" FontSize="11" Margin="10,6" TextWrapping="Wrap"
+                           Text="Drag a node onto the graph, or double-click or press Enter to add it at the center of the view. Right-click the graph to search nodes there." />
+                <ListBox x:Name="PaletteList" Classes="palette" Background="Transparent" />
+              </DockPanel>
+            </TabItem>
+          </TabControl>
         </Border>
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
         <!-- Graph canvas -->
         <Panel Grid.Column="2">
           <canvas:NodeCanvas x:Name="GraphCanvas" />
+          <!-- A class or struct has properties instead of nodes; they are edited in Details. -->
+          <TextBlock x:Name="TypeGraphHint" IsVisible="False" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     TextAlignment="Center" TextWrapping="Wrap" MaxWidth="380" IsHitTestVisible="False" />
           <!-- Inline value editor, placed over a node's value row. -->
           <TextBox x:Name="InlineEditor" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top"
                    MinHeight="0" Padding="6,2" FontSize="13" TextWrapping="Wrap" NewLine="&#10;" />
-          <!-- Quick add: shown where a wire is released on empty space, lists only nodes that can connect to it. -->
-          <Border x:Name="QuickAdd" IsVisible="False" Width="280" MaxHeight="340" HorizontalAlignment="Left" VerticalAlignment="Top"
+          <!-- Action menu: opened by right-clicking empty space or releasing a wire there. Nodes are grouped by category. -->
+          <Border x:Name="ActionMenu" IsVisible="False" Width="360" Height="420" HorizontalAlignment="Left" VerticalAlignment="Top"
                   Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
                   CornerRadius="6" Padding="0,6,0,4" BoxShadow="0 6 18 0 #80000000">
             <DockPanel>
-              <TextBlock x:Name="QuickAddTitle" DockPanel.Dock="Top" Classes="secondary" FontSize="11" Margin="10,0,10,4" />
-              <TextBox x:Name="QuickAddSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search compatible nodes" />
-              <ListBox x:Name="QuickAddList" Classes="palette" Background="Transparent" />
+              <DockPanel DockPanel.Dock="Top" Margin="10,0,8,4">
+                <CheckBox x:Name="ContextSensitiveBox" DockPanel.Dock="Right" Content="Context Sensitive" IsChecked="True" FontSize="12"
+                          ToolTip.Tip="Show only nodes that fit here: from a wire or a selected node, nodes that can connect to it" />
+                <TextBlock x:Name="ActionMenuTitle" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              </DockPanel>
+              <TextBox x:Name="ActionSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search" />
+              <TreeView x:Name="ActionTree" Background="Transparent" />
             </DockPanel>
           </Border>
           <Border x:Name="EmptyState" Background="{StaticResource IdeWindowBackground}">

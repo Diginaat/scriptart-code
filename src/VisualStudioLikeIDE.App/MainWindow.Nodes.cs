@@ -1,17 +1,22 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using VisualStudioLikeIDE.App.Canvas;
 using VisualStudioLikeIDE.Compiler.Nodes;
+using VisualStudioLikeIDE.Compiler.TypeSystem;
 using VisualStudioLikeIDE.GraphModel;
 
 namespace VisualStudioLikeIDE.App;
 
-/// <summary>Node creation: the palette (search, double-click, drag onto the graph) and quick add after a wire is dropped on empty space.</summary>
+/// <summary>
+/// Node creation: the palette (search, double-click, drag onto the graph) and the action menu, opened by right-clicking empty space
+/// or releasing a wire there, with nodes grouped by category and an optional context-sensitive filter.
+/// </summary>
 public sealed partial class MainWindow
 {
     private int placementOffset;
-    private WireDroppedEventArgs? quickAddWire;
+    private ActionMenuContext? actionMenu;
     private (ListBoxItem Item, Avalonia.Point Start)? palettePress;
     private bool paletteDragging;
 
@@ -127,61 +132,128 @@ public sealed partial class MainWindow
         e.Handled = true;
     }
 
-    private void ShowQuickAdd(WireDroppedEventArgs wire)
+    /// <summary>Opens the action menu for a wire released on empty space; the new node is connected to the wire's pin.</summary>
+    private void ShowActionMenu(WireDroppedEventArgs wire)
     {
         if (workspace?.Editor.FindPin(wire.Source) is not { } pin)
         {
             return;
         }
 
-        quickAddWire = wire;
         string type = pin.DataType?.DisplayName ?? "execution";
-        QuickAddTitle.Text = pin.Direction == PinDirection.Output ? $"Connect {type} output to…" : $"Connect {type} input from…";
-        QuickAddSearch.Text = "";
-        PopulateQuickAdd();
-
-        // Keep the popup inside the canvas.
-        double x = Math.Clamp(wire.Screen.X, 0, Math.Max(0, GraphCanvas.Bounds.Width - QuickAdd.Width));
-        double y = Math.Clamp(wire.Screen.Y, 0, Math.Max(0, GraphCanvas.Bounds.Height - QuickAdd.MaxHeight));
-        QuickAdd.Margin = new Avalonia.Thickness(x, y, 0, 0);
-        QuickAdd.IsVisible = true;
-        QuickAddSearch.Focus();
+        OpenActionMenu(new ActionMenuContext(wire.World, wire.Screen, [wire.Source],
+            pin.Direction == PinDirection.Output ? $"Actions taking {type} from {pin.DisplayName}" : $"Actions giving {type} to {pin.DisplayName}"));
     }
 
-    private void PopulateQuickAdd()
+    /// <summary>
+    /// Opens the action menu for a right-click on empty space. With one node selected, context sensitivity offers nodes that can
+    /// connect to one of its free pins, and the chosen node is wired to it.
+    /// </summary>
+    private void ShowActionMenu(ActionMenuRequestedEventArgs request)
     {
-        QuickAddList.Items.Clear();
-        if (workspace is null || quickAddWire is null)
+        if (workspace is null || TypeRef.IsTypeGraph(workspace.Editor.Graph))
         {
             return;
         }
 
-        foreach (NodeDefinition definition in MatchingDefinitions(QuickAddSearch.Text)
-            .Where(definition => workspace.Editor.FindCompatiblePin(definition, quickAddWire.Source) is not null))
-        {
-            QuickAddList.Items.Add(CreateNodeItem(definition));
-        }
+        IReadOnlyList<PinRef> anchors = GraphCanvas.SelectedItems.Count == 1 ? workspace.Editor.FreePins(GraphCanvas.SelectedItems.First()) : [];
+        string title = anchors.Count > 0 && workspace.Editor.Graph.FindNode(anchors[0].Node) is { } node && workspace.Editor.DefinitionOf(node) is { } definition
+            ? $"Actions connecting to {definition.DisplayName}"
+            : $"All Actions for {workspace.Editor.Graph.Name}";
+        OpenActionMenu(new ActionMenuContext(request.World, request.Screen, anchors, title));
     }
 
-    private void AddNodeFromQuickAdd(ListBoxItem? item)
+    private void OpenActionMenu(ActionMenuContext context)
     {
-        if (workspace is null || quickAddWire is not { } wire || item?.Tag is not NodeDefinition definition)
+        HideCommandPalette(focusGraph: false);
+        actionMenu = context;
+        ActionSearch.Text = "";
+        PopulateActionMenu();
+
+        // Keep the menu inside the canvas.
+        double x = Math.Clamp(context.Screen.X, 0, Math.Max(0, GraphCanvas.Bounds.Width - ActionMenu.Width));
+        double y = Math.Clamp(context.Screen.Y, 0, Math.Max(0, GraphCanvas.Bounds.Height - ActionMenu.Height));
+        ActionMenu.Margin = new Avalonia.Thickness(x, y, 0, 0);
+        ActionMenu.IsVisible = true;
+        ActionSearch.Focus();
+    }
+
+    private void PopulateActionMenu()
+    {
+        ActionTree.Items.Clear();
+        if (workspace is null || actionMenu is not { } context)
         {
             return;
         }
 
-        // Place the node so its connecting side sits at the release point.
-        bool fromOutput = workspace.Editor.FindPin(wire.Source)?.Direction == PinDirection.Output;
-        double x = fromOutput ? wire.World.X : wire.World.X - 180;
-        GraphNode node = workspace.Editor.AddConnectedNode(definition, Math.Round(x), Math.Round(wire.World.Y - 14), wire.Source);
-        HideQuickAdd();
+        bool sensitive = ContextSensitiveBox.IsChecked == true;
+        ActionMenuTitle.Text = sensitive ? context.Title : $"All Actions for {workspace.Editor.Graph.Name}";
+        HashSet<NodeDefinition> offered = [.. workspace.Editor.Actions(context.Anchors, sensitive)];
+        string filter = ActionSearch.Text?.Trim() ?? "";
+        List<IGrouping<string, NodeDefinition>> categories = [.. MatchingDefinitions(filter).Where(offered.Contains).GroupBy(definition => definition.Category)];
+
+        // While searching, or when few nodes fit, every category is open so the matches show without extra clicks.
+        bool expand = filter.Length > 0 || categories.Sum(category => category.Count()) <= 30;
+        foreach (IGrouping<string, NodeDefinition> category in categories)
+        {
+            var header = new TreeViewItem
+            {
+                Header = new TextBlock { Text = category.Key, FontWeight = FontWeight.SemiBold },
+                IsExpanded = expand,
+                MinHeight = 0,
+            };
+            foreach (NodeDefinition definition in category)
+            {
+                var item = new TreeViewItem { Header = definition.DisplayName, Tag = definition, MinHeight = 0 };
+                ToolTip.SetTip(item, definition.Description);
+                header.Items.Add(item);
+            }
+
+            ActionTree.Items.Add(header);
+        }
+
+        if (categories.Count == 0)
+        {
+            ActionTree.Items.Add(new TreeViewItem
+            {
+                Header = new TextBlock
+                {
+                    Text = sensitive ? "No matching node fits here. Turn off Context Sensitive to see every node." : "No matching node.",
+                    Classes = { "secondary" },
+                    TextWrapping = TextWrapping.Wrap,
+                },
+                IsEnabled = false,
+            });
+        }
+    }
+
+    private TreeViewItem? FirstAction() =>
+        ActionTree.Items.OfType<TreeViewItem>().SelectMany(category => category.Items.OfType<TreeViewItem>()).FirstOrDefault();
+
+    private void AddNodeFromActionMenu(TreeViewItem? item)
+    {
+        if (workspace is null || actionMenu is not { } context || item?.Tag is not NodeDefinition definition)
+        {
+            return;
+        }
+
+        // Place the node so its connecting side sits at the click point: right of an output, left of an input.
+        PinRef? anchor = context.Anchors.FirstOrDefault(anchor => workspace.Editor.FindCompatiblePin(definition, anchor) is not null);
+        bool toInput = anchor is not null && workspace.Editor.FindPin(anchor)?.Direction == PinDirection.Input;
+        double x = toInput ? context.World.X - 180 : context.World.X;
+        GraphNode node = workspace.Editor.AddActionNode(definition, Math.Round(x), Math.Round(context.World.Y - 14), context.Anchors);
+        HideActionMenu();
         GraphCanvas.Select(node.Id, frame: false);
         GraphCanvas.Focus();
+        SetStatus($"Added {definition.DisplayName}.");
     }
 
-    private void HideQuickAdd()
+    private void HideActionMenu()
     {
-        QuickAdd.IsVisible = false;
-        quickAddWire = null;
+        ActionMenu.IsVisible = false;
+        actionMenu = null;
     }
+
+    /// <summary>Where the action menu was opened, and the pins a chosen node is connected to.</summary>
+    private sealed record ActionMenuContext(Avalonia.Point World, Avalonia.Point Screen, IReadOnlyList<PinRef> Anchors, string Title);
 }

@@ -60,7 +60,8 @@ The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 
 | Action | Input |
 | --- | --- |
-| Add a node | Drag from the palette onto the graph, or search the palette and double-click or press Enter |
+| Add a node | Right-click empty space on the graph and search the action menu, or drag from the Palette tab onto the graph |
+| Context sensitivity | The action menu's **Context Sensitive** box (on by default) shows only nodes that fit: from a released wire or a selected node, nodes that can connect to it, wired up when added. Clear it to see every node |
 | Add a connected node | Drag a wire from a pin and release on empty space, then pick from the compatible nodes |
 | Connect | Drag from a pin to a compatible pin (either direction) |
 | Disconnect | Alt+click a pin |
@@ -69,7 +70,9 @@ The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 | Align or distribute | Select items, then Edit → Arrange (align edges or centers; space three or more evenly) |
 | Connect from the keyboard | Select two nodes, press Ctrl+L (Edit → Connect Pins…), pick a connection or a wire to remove, Enter |
 | Loops | While Loop and For Loop (Flow category): Loop Body runs each iteration, Completed runs afterwards. Break and Continue work inside a body |
-| Variables | Click empty canvas; in Details → Variables, Add Variable and set its name, type, and initial value. Its Get and Set nodes appear in the palette under Variables |
+| My Project panel | Lists the graphs, functions, classes, structs, and the open graph's variables in collapsible sections, each with a **+** button; **+ Add New** offers all of them. Click a graph to open it |
+| Variables | **+** next to Variables; select a variable to edit its name, type, and initial value in Details. Drag it onto the graph for a Get (hold Ctrl) or Set (hold Alt) node, or pick one from the menu |
+| Classes and structs | **+** next to Classes or Structs; add properties in Details. New, Get, and Set (class) or With (struct) nodes appear under Types |
 | Command palette | Ctrl+Shift+P: search every menu command and node by name; Enter runs the first match |
 | Frame graph | Home |
 | Frame time | View → Frame Statistics shows how long the canvas takes to draw |
@@ -92,7 +95,7 @@ src/
   VisualStudioLikeIDE.App            Avalonia desktop IDE
   VisualStudioLikeIDE.Cli            headless generate/build/run
 tests/                               unit, integration (real dotnet builds), performance harness
-samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections
+samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types
 docs/                                architecture, compiler pipeline, formats, decisions, roadmap
 ```
 

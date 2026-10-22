@@ -137,12 +137,19 @@ public sealed partial class MainWindow
             || workspace.Editor.DefinitionOf(node) is not { } definition)
         {
             InspectorPanel.Children.Add(new TextBlock { Text = workspace.Graph.Graph.Name, FontSize = 16, FontWeight = FontWeight.SemiBold });
+            if (Compiler.TypeSystem.TypeRef.IsTypeGraph(workspace.Graph.Graph))
+            {
+                InspectorPanel.Children.Add(new TextBlock { Text = workspace.Graph.RelativePath, Classes = { "secondary" } });
+                AddTypeEditors();
+                return;
+            }
+
             InspectorPanel.Children.Add(new TextBlock { Text = $"{workspace.Graph.RelativePath}\n{workspace.Graph.Graph.Nodes.Count} nodes, {workspace.Graph.Graph.Connections.Count} connections", Classes = { "secondary" } });
             InspectorPanel.Children.Add(new TextBlock
             {
                 Text = GraphCanvas.SelectedItems.Count > 1
                     ? $"{GraphCanvas.SelectedItems.Count} items selected."
-                    : "Select a node to see its details and edit its values.\n\nDrag from a pin to connect. Right-drag to pan, scroll to zoom, Alt+click a pin to disconnect. Press C to add a comment around the selection.",
+                    : "Select a node to see its details and edit its values.\n\nRight-click the graph to search nodes. Drag from a pin to connect, or release it on empty space to search nodes that fit. Right-drag to pan, scroll to zoom, Alt+click a pin to disconnect. Press C to add a comment around the selection.",
                 TextWrapping = TextWrapping.Wrap,
                 Classes = { "secondary" },
                 Margin = new Avalonia.Thickness(0, 8, 0, 0),

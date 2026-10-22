@@ -14,8 +14,9 @@ public sealed class NodeLibrary
     // Variable nodes get their pins from the variable they refer to. Definitions are immutable, so one is shared per variable state.
     private readonly ConcurrentDictionary<(string Id, string Name, TypeRef Type, bool Set), NodeDefinition> variableDefinitions = new();
 
-    // Function entry, return, and call nodes get their pins from a function's signature; keyed by node type and signature.
-    private readonly ConcurrentDictionary<string, NodeDefinition> functionDefinitions = new(StringComparer.Ordinal);
+    // Function entry, return, and call nodes get their pins from a function's signature, and type nodes from a class or struct;
+    // keyed by node type and everything the pins depend on.
+    private readonly ConcurrentDictionary<string, NodeDefinition> generatedDefinitions = new(StringComparer.Ordinal);
 
     public IEnumerable<NodeDefinition> Definitions => definitions.Values;
 
@@ -32,29 +33,37 @@ public sealed class NodeLibrary
 
     /// <summary>
     /// The definition of a node placed in <paramref name="graph"/>. Most nodes are found by type. Variable nodes are built from the
-    /// variable named by their <see cref="VariableNodes.VariableProperty"/>, and function nodes from a function's signature: the
-    /// graph's own for entry and return nodes, the called graph's (found in <paramref name="functions"/>) for call nodes. These are
-    /// null when what they refer to is missing, has an unsupported type, or does not fit the graph.
+    /// variable named by their <see cref="VariableNodes.VariableProperty"/>, function nodes from a function's signature (the graph's
+    /// own for entry and return nodes, the called graph's for call nodes), and type nodes from a class or struct. Called functions
+    /// and types are found in <paramref name="projectGraphs"/>, the project's graphs. These are null when what they refer to is
+    /// missing, has an unsupported type, or does not fit the graph.
     /// </summary>
-    public NodeDefinition? Resolve(GraphNode node, GraphDocument graph, IReadOnlyList<GraphDocument>? functions = null)
+    public NodeDefinition? Resolve(GraphNode node, GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
         ArgumentNullException.ThrowIfNull(node);
         ArgumentNullException.ThrowIfNull(graph);
+        projectGraphs ??= [];
         switch (node.Type)
         {
             case VariableNodes.GetTypeId or VariableNodes.SetTypeId:
                 return node.Properties.TryGetValue(VariableNodes.VariableProperty, out string? variableId) && graph.FindVariable(variableId) is { } variable
-                    ? VariableDefinition(variable, node.Type == VariableNodes.SetTypeId)
+                    ? VariableDefinition(variable, node.Type == VariableNodes.SetTypeId, projectGraphs)
                     : null;
             case FunctionNodes.EntryTypeId:
-                return FunctionSignature.Of(graph) is { } own ? FunctionDefinition(node.Type, own) : null;
+                return FunctionSignature.Of(graph, projectGraphs) is { } own ? FunctionDefinition(node.Type, own) : null;
             case FunctionNodes.ReturnTypeId:
-                return FunctionSignature.Of(graph) is { } returning && returning.ReturnType != TypeRef.Void ? FunctionDefinition(node.Type, returning) : null;
+                return FunctionSignature.Of(graph, projectGraphs) is { } returning && returning.ReturnType != TypeRef.Void ? FunctionDefinition(node.Type, returning) : null;
             case FunctionNodes.CallTypeId:
                 return node.Properties.TryGetValue(FunctionNodes.FunctionProperty, out string? functionId)
-                    && functions?.FirstOrDefault(function => function.Id == functionId) is { } called
-                    && FunctionSignature.Of(called) is { } signature
+                    && projectGraphs.FirstOrDefault(function => function.Id == functionId) is { } called
+                    && FunctionSignature.Of(called, projectGraphs) is { } signature
                     ? FunctionDefinition(node.Type, signature)
+                    : null;
+            case TypeNodes.CreateTypeId or TypeNodes.GetTypeId or TypeNodes.SetTypeId or TypeNodes.WithTypeId:
+                return node.Properties.TryGetValue(TypeNodes.TypeProperty, out string? typeId)
+                    && projectGraphs.FirstOrDefault(type => type.Id == typeId) is { } typeGraph
+                    && ProjectTypeDefinition.Of(typeGraph, projectGraphs) is { } definition
+                    ? TypeDefinition(node.Type, definition, node.Properties.GetValueOrDefault(TypeNodes.PropertyProperty))
                     : null;
             default:
                 return Find(node.Type);
@@ -63,14 +72,21 @@ public sealed class NodeLibrary
 
     /// <summary>
     /// Every node that can be added to <paramref name="graph"/>: the registered nodes, a Get and a Set node per variable, the entry
-    /// and return nodes of a function graph, and a call node per function in <paramref name="functions"/>.
+    /// and return nodes of a function graph, a call node per function in <paramref name="projectGraphs"/>, and per class or struct a
+    /// New node and nodes for its properties. A class or struct graph has no method, so nothing can be added to it.
     /// </summary>
-    public IEnumerable<NodeDefinition> DefinitionsFor(GraphDocument graph, IReadOnlyList<GraphDocument>? functions = null)
+    public IEnumerable<NodeDefinition> DefinitionsFor(GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
+        projectGraphs ??= [];
+        if (TypeRef.IsTypeGraph(graph))
+        {
+            return [];
+        }
+
         IEnumerable<NodeDefinition?> graphNodes = graph.Variables.SelectMany(variable =>
-            new[] { VariableDefinition(variable, set: false), VariableDefinition(variable, set: true) });
-        if (FunctionSignature.Of(graph) is { } own)
+            new[] { VariableDefinition(variable, set: false, projectGraphs), VariableDefinition(variable, set: true, projectGraphs) });
+        if (FunctionSignature.Of(graph, projectGraphs) is { } own)
         {
             graphNodes = graphNodes.Append(FunctionDefinition(FunctionNodes.EntryTypeId, own));
             if (own.ReturnType != TypeRef.Void)
@@ -79,21 +95,52 @@ public sealed class NodeLibrary
             }
         }
 
-        IEnumerable<NodeDefinition?> calls = (functions ?? []).Select(FunctionSignature.Of).OfType<FunctionSignature>()
+        IEnumerable<NodeDefinition?> calls = projectGraphs.Select(function => FunctionSignature.Of(function, projectGraphs)).OfType<FunctionSignature>()
             .Select(signature => FunctionDefinition(FunctionNodes.CallTypeId, signature));
-        return Definitions.Concat(graphNodes.Concat(calls).OfType<NodeDefinition>());
+        IEnumerable<NodeDefinition?> types = projectGraphs.Select(type => ProjectTypeDefinition.Of(type, projectGraphs)).OfType<ProjectTypeDefinition>()
+            .SelectMany(type => type.Properties
+                .SelectMany(property => new[] { TypeNodes.GetTypeId, type.IsStruct ? TypeNodes.WithTypeId : TypeNodes.SetTypeId }
+                    .Select(typeId => TypeDefinition(typeId, type, property.Id)))
+                .Prepend(TypeDefinition(TypeNodes.CreateTypeId, type, null)));
+        return Definitions.Concat(graphNodes.Concat(calls).Concat(types).OfType<NodeDefinition>());
     }
 
     private NodeDefinition FunctionDefinition(string typeId, FunctionSignature signature) =>
-        functionDefinitions.GetOrAdd(typeId + "\n" + signature.Key, _ => typeId switch
+        generatedDefinitions.GetOrAdd(typeId + "\n" + signature.Key, _ => typeId switch
         {
             FunctionNodes.EntryTypeId => new FunctionEntryNode(signature),
             FunctionNodes.ReturnTypeId => new FunctionReturnNode(signature.ReturnType),
             _ => new FunctionCallNode(signature),
         });
 
-    private NodeDefinition? VariableDefinition(GraphVariable variable, bool set) =>
-        TypeRef.FromName(variable.Type) is { } type
+    /// <summary>
+    /// A type node of <paramref name="type"/>; property nodes also name the property. Null when the property is missing, and for Set
+    /// on a struct or With on a class: a struct property is changed by copying the value, a class property by assigning it.
+    /// </summary>
+    private NodeDefinition? TypeDefinition(string typeId, ProjectTypeDefinition type, string? propertyId)
+    {
+        if (typeId == TypeNodes.CreateTypeId)
+        {
+            return generatedDefinitions.GetOrAdd(typeId + "\n" + type.Key, _ => type.IsStruct ? new CreateStructNode(type) : new CreateObjectNode(type));
+        }
+
+        int index = type.Properties.Select(candidate => candidate.Id).ToList().IndexOf(propertyId ?? "");
+        if (index < 0 || (typeId == TypeNodes.SetTypeId && type.IsStruct) || (typeId == TypeNodes.WithTypeId && !type.IsStruct))
+        {
+            return null;
+        }
+
+        (string id, string name, TypeRef propertyType) = type.Properties[index];
+        return generatedDefinitions.GetOrAdd(typeId + "\n" + id + "\n" + type.Key, _ => typeId switch
+        {
+            TypeNodes.GetTypeId => new GetPropertyNode(type, id, name, propertyType),
+            TypeNodes.SetTypeId => new SetPropertyNode(type, id, name, propertyType),
+            _ => new WithPropertyNode(type, id, name, propertyType),
+        });
+    }
+
+    private NodeDefinition? VariableDefinition(GraphVariable variable, bool set, IReadOnlyList<GraphDocument> projectGraphs) =>
+        TypeRef.FromName(variable.Type, projectGraphs) is { } type
             ? variableDefinitions.GetOrAdd((variable.Id, variable.Name, type, set), key => key.Set
                 ? new VariableSetNode(key.Id, key.Name, key.Type)
                 : new VariableGetNode(key.Id, key.Name, key.Type))

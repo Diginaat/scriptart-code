@@ -33,6 +33,9 @@ public sealed record IrForEach(IrLocal Item, IrExpression Collection, IrBlock Bo
 /// <summary>Replaces an element of a list: <c>list[index] = value;</c>.</summary>
 public sealed record IrElementAssignment(IrExpression Receiver, IrExpression Index, IrExpression Value) : IrStatement;
 
+/// <summary>Assigns a property of an object: <c>point.X = value;</c>.</summary>
+public sealed record IrMemberAssignment(IrExpression Receiver, string MemberName, IrExpression Value) : IrStatement;
+
 public sealed record IrBreak : IrStatement;
 
 public sealed record IrContinue : IrStatement;
@@ -67,6 +70,31 @@ public sealed record IrMethod(
     string SourceGraphId,
     bool IsPrivate = false);
 
-/// <summary>A static class generated from one graph.</summary>
+/// <summary>A property with a public getter and setter, and the value it starts with; no initializer when that is the type's default.</summary>
+public sealed record IrProperty(string Name, TypeRef Type, IrExpression? Initializer);
+
+public enum IrClassKind
+{
+    /// <summary>A static class holding methods, generated from the entry graph and the function graphs.</summary>
+    Static,
+
+    /// <summary>A sealed class holding properties.</summary>
+    Class,
+
+    /// <summary>A struct holding properties.</summary>
+    Struct,
+}
+
+/// <summary>A type generated from one graph: a static class with methods, or a class or struct with properties.</summary>
 /// <param name="IsPartial">True when other generated files add methods to the same class.</param>
-public sealed record IrClass(string Namespace, string Name, IReadOnlyList<IrMethod> Methods, string SourceGraphId, bool IsPartial = false);
+public sealed record IrClass(
+    string Namespace,
+    string Name,
+    IReadOnlyList<IrMethod> Methods,
+    string SourceGraphId,
+    bool IsPartial = false,
+    IrClassKind Kind = IrClassKind.Static,
+    IReadOnlyList<IrProperty>? Properties = null)
+{
+    public IReadOnlyList<IrProperty> Properties { get; init; } = Properties ?? [];
+}

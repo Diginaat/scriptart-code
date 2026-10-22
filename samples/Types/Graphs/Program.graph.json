@@ -1,0 +1,728 @@
+{
+  "schemaVersion": 6,
+  "id": "program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "new",
+      "type": "type.create",
+      "x": 240,
+      "y": 0,
+      "properties": {
+        "type": "account"
+      }
+    },
+    {
+      "id": "setOwner",
+      "type": "type.set-property",
+      "x": 480,
+      "y": 0,
+      "properties": {
+        "property": "owner",
+        "type": "account"
+      }
+    },
+    {
+      "id": "ada",
+      "type": "literal.string",
+      "x": 240,
+      "y": 160,
+      "properties": {
+        "value": "Ada"
+      }
+    },
+    {
+      "id": "setBalance",
+      "type": "type.set-property",
+      "x": 720,
+      "y": 0,
+      "properties": {
+        "property": "balance",
+        "type": "account"
+      }
+    },
+    {
+      "id": "getBalance",
+      "type": "type.get-property",
+      "x": 480,
+      "y": 200,
+      "properties": {
+        "property": "balance",
+        "type": "account"
+      }
+    },
+    {
+      "id": "deposit",
+      "type": "literal.int",
+      "x": 480,
+      "y": 300,
+      "properties": {
+        "value": "100"
+      }
+    },
+    {
+      "id": "add",
+      "type": "math.int.add",
+      "x": 720,
+      "y": 200,
+      "properties": {}
+    },
+    {
+      "id": "printAccount",
+      "type": "console.write-line",
+      "x": 960,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "getOwner",
+      "type": "type.get-property",
+      "x": 720,
+      "y": 360,
+      "properties": {
+        "property": "owner",
+        "type": "account"
+      }
+    },
+    {
+      "id": "has",
+      "type": "literal.string",
+      "x": 720,
+      "y": 460,
+      "properties": {
+        "value": " has "
+      }
+    },
+    {
+      "id": "join1",
+      "type": "string.concat",
+      "x": 960,
+      "y": 360,
+      "properties": {}
+    },
+    {
+      "id": "getBalance2",
+      "type": "type.get-property",
+      "x": 720,
+      "y": 560,
+      "properties": {
+        "property": "balance",
+        "type": "account"
+      }
+    },
+    {
+      "id": "balanceText",
+      "type": "convert.int-to-string",
+      "x": 960,
+      "y": 560,
+      "properties": {}
+    },
+    {
+      "id": "join2",
+      "type": "string.concat",
+      "x": 1200,
+      "y": 420,
+      "properties": {}
+    },
+    {
+      "id": "setX",
+      "type": "variable.set",
+      "x": 1200,
+      "y": 0,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "getPos1",
+      "type": "variable.get",
+      "x": 960,
+      "y": 760,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "withX",
+      "type": "type.with-property",
+      "x": 1200,
+      "y": 760,
+      "properties": {
+        "property": "x",
+        "type": "point"
+      }
+    },
+    {
+      "id": "three",
+      "type": "literal.int",
+      "x": 960,
+      "y": 860,
+      "properties": {
+        "value": "3"
+      }
+    },
+    {
+      "id": "setY",
+      "type": "variable.set",
+      "x": 1440,
+      "y": 0,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "getPos2",
+      "type": "variable.get",
+      "x": 1200,
+      "y": 960,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "withY",
+      "type": "type.with-property",
+      "x": 1440,
+      "y": 960,
+      "properties": {
+        "property": "y",
+        "type": "point"
+      }
+    },
+    {
+      "id": "four",
+      "type": "literal.int",
+      "x": 1200,
+      "y": 1060,
+      "properties": {
+        "value": "4"
+      }
+    },
+    {
+      "id": "printPoint",
+      "type": "console.write-line",
+      "x": 1680,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "getPos3",
+      "type": "variable.get",
+      "x": 1200,
+      "y": 1200,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "getX",
+      "type": "type.get-property",
+      "x": 1440,
+      "y": 1200,
+      "properties": {
+        "property": "x",
+        "type": "point"
+      }
+    },
+    {
+      "id": "xText",
+      "type": "convert.int-to-string",
+      "x": 1680,
+      "y": 1200,
+      "properties": {}
+    },
+    {
+      "id": "pointLabel",
+      "type": "literal.string",
+      "x": 1440,
+      "y": 1300,
+      "properties": {
+        "value": "Point "
+      }
+    },
+    {
+      "id": "join3",
+      "type": "string.concat",
+      "x": 1920,
+      "y": 1200,
+      "properties": {}
+    },
+    {
+      "id": "comma",
+      "type": "literal.string",
+      "x": 1680,
+      "y": 1400,
+      "properties": {
+        "value": ", "
+      }
+    },
+    {
+      "id": "join4",
+      "type": "string.concat",
+      "x": 2160,
+      "y": 1200,
+      "properties": {}
+    },
+    {
+      "id": "getPos4",
+      "type": "variable.get",
+      "x": 1680,
+      "y": 1500,
+      "properties": {
+        "variable": "position"
+      }
+    },
+    {
+      "id": "getY",
+      "type": "type.get-property",
+      "x": 1920,
+      "y": 1500,
+      "properties": {
+        "property": "y",
+        "type": "point"
+      }
+    },
+    {
+      "id": "yText",
+      "type": "convert.int-to-string",
+      "x": 2160,
+      "y": 1500,
+      "properties": {}
+    },
+    {
+      "id": "join5",
+      "type": "string.concat",
+      "x": 2400,
+      "y": 1300,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "new",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "then"
+      },
+      "to": {
+        "node": "setOwner",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "setOwner",
+        "pin": "then"
+      },
+      "to": {
+        "node": "setBalance",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "setBalance",
+        "pin": "then"
+      },
+      "to": {
+        "node": "printAccount",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "setOwner",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "ada",
+        "pin": "value"
+      },
+      "to": {
+        "node": "setOwner",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "setBalance",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getBalance",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getBalance",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "deposit",
+        "pin": "value"
+      },
+      "to": {
+        "node": "add",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "add",
+        "pin": "result"
+      },
+      "to": {
+        "node": "setBalance",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getOwner",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getOwner",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "has",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join1",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "new",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getBalance2",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getBalance2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "balanceText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "join1",
+        "pin": "result"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "balanceText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join2",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join2",
+        "pin": "result"
+      },
+      "to": {
+        "node": "printAccount",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "printAccount",
+        "pin": "then"
+      },
+      "to": {
+        "node": "setX",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "setX",
+        "pin": "then"
+      },
+      "to": {
+        "node": "setY",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "setY",
+        "pin": "then"
+      },
+      "to": {
+        "node": "printPoint",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "getPos1",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withX",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "three",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withX",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "withX",
+        "pin": "result"
+      },
+      "to": {
+        "node": "setX",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "getPos2",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withY",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "four",
+        "pin": "value"
+      },
+      "to": {
+        "node": "withY",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "withY",
+        "pin": "result"
+      },
+      "to": {
+        "node": "setY",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "getPos3",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getX",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getX",
+        "pin": "value"
+      },
+      "to": {
+        "node": "xText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "pointLabel",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join3",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "xText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join3",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join3",
+        "pin": "result"
+      },
+      "to": {
+        "node": "join4",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "comma",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join4",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "getPos4",
+        "pin": "value"
+      },
+      "to": {
+        "node": "getY",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "getY",
+        "pin": "value"
+      },
+      "to": {
+        "node": "yText",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "join4",
+        "pin": "result"
+      },
+      "to": {
+        "node": "join5",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "yText",
+        "pin": "text"
+      },
+      "to": {
+        "node": "join5",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join5",
+        "pin": "result"
+      },
+      "to": {
+        "node": "printPoint",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [
+    {
+      "id": "classComment",
+      "x": -40,
+      "y": -60,
+      "width": 1440,
+      "height": 700,
+      "text": "A class object is shared: Set changes it for every reference"
+    },
+    {
+      "id": "structComment",
+      "x": 920,
+      "y": 700,
+      "width": 1720,
+      "height": 900,
+      "text": "A struct is a value: With makes a changed copy, Set stores it"
+    }
+  ],
+  "variables": [
+    {
+      "id": "position",
+      "name": "position",
+      "type": "Point",
+      "value": ""
+    }
+  ],
+  "parameters": [],
+  "properties": []
+}

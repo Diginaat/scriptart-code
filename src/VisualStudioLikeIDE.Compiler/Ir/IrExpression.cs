@@ -60,6 +60,9 @@ public sealed record IrElementAccess(IrExpression Receiver, IrExpression Index, 
 /// <summary>Reads a property or field of a value, for example <c>exception.Message</c>.</summary>
 public sealed record IrMemberAccess(IrExpression Receiver, string MemberName, TypeRef Type) : IrExpression(Type);
 
+/// <summary>A copy of a struct value with one property changed: <c>point with { X = value }</c>.</summary>
+public sealed record IrWith(IrExpression Receiver, string MemberName, IrExpression Value) : IrExpression(Receiver.Type);
+
 public sealed record IrLocalReference(IrLocal Local) : IrExpression(Local.Type);
 
 /// <summary>An implicit, lossless conversion inserted where a pin of one type feeds a pin of another.</summary>

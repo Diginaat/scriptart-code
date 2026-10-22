@@ -68,6 +68,15 @@ public sealed class EndToEndTests
         Assert.Equal("Hello, functions!\n1! = 1\n2! = 2\n3! = 6\n4! = 24\n5! = 120\n", await GenerateBuildAndRun(project, input: null));
     }
 
+    [Fact]
+    public async Task TypesSampleSharesClassObjectsAndCopiesStructs()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Types", directory.Path);
+
+        Assert.Equal("Ada has 100\nPoint 3, 4\n", await GenerateBuildAndRun(project, input: null));
+    }
+
     [Theory]
     [InlineData("21", "42\n")]
     [InlineData("abc", "Not a number: The input string 'abc' was not in a correct format.\n")]
@@ -138,6 +147,7 @@ public sealed class EndToEndTests
     [InlineData("Functions")]
     [InlineData("Exceptions")]
     [InlineData("Collections")]
+    [InlineData("Types")]
     public void CheckedInSampleCodeMatchesGenerator(string sample)
     {
         // The samples directory holds the generated code so samples build without the IDE. It must stay current.

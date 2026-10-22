@@ -69,6 +69,8 @@ If any stage reports an error, no C# is produced and nothing is written.
 | VSG0026 | Function with a return type has a path that does not end at Return Value |
 | VSG0027 | Invalid function signature: name, parameter name, or type |
 | VSG0028 | Return, Return Value, Break, or Continue would leave a Finally block |
+| VSG0029 | Type node for a class, struct, or property that does not exist, or Set on a struct or With on a class |
+| VSG0030 | Invalid class or struct: name, nodes in a type graph, property name, type, or initial value, or a type that contains itself |
 | VSP0001 | Generated file target exists and is handwritten |
 | CSxxxx | Roslyn diagnostic, passed through |
 

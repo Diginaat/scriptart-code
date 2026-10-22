@@ -8,11 +8,11 @@ using VisualStudioLikeIDE.GraphModel;
 
 namespace VisualStudioLikeIDE.App;
 
-/// <summary>The Variables section of the Details panel, shown when no single node is selected.</summary>
+/// <summary>The Variable section of the Details panel, shown for the variable selected in My Project.</summary>
 public partial class MainWindow
 {
-    // The palette lists Get and Set nodes per variable and a call node per function; it is rebuilt only when the open graph,
-    // its variables, or a function signature changes.
+    // The palette lists Get and Set nodes per variable, a call node per function, and nodes per class and struct; it is rebuilt
+    // only when the open graph, its variables, a function signature, or a type changes.
     private string paletteVariables = "";
 
     // After adding a variable, its name box takes focus once the panel has been rebuilt.
@@ -25,7 +25,8 @@ public partial class MainWindow
             : string.Join("\n", [
                 workspace.Editor.Graph.Id,
                 .. workspace.Editor.Graph.Variables.Select(variable => $"{variable.Id}:{variable.Name}:{variable.Type}"),
-                .. workspace.Project.Functions.Select(FunctionSignatureText)]);
+                .. workspace.Project.Functions.Select(FunctionSignatureText),
+                .. workspace.Project.GraphDocuments.Where(TypeRef.IsTypeGraph).Select(TypeSignatureText)]);
         if (signature != paletteVariables)
         {
             paletteVariables = signature;
@@ -33,33 +34,19 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>The variable selected in My Project, edited in Details while no node is selected.</summary>
     private void AddVariableEditors()
     {
-        if (workspace is null)
+        if (workspace is null || selectedVariableId is null || workspace.Editor.Graph.FindVariable(selectedVariableId) is not { } variable)
         {
             return;
         }
 
-        GraphDocument graph = workspace.Editor.Graph;
-        InspectorPanel.Children.Add(new TextBlock { Text = "VARIABLES", Classes = { "panelTitle" }, Margin = new Avalonia.Thickness(0, 14, 0, 4) });
-        foreach (GraphVariable variable in graph.Variables)
-        {
-            AddVariableEditor(variable);
-        }
-
-        var add = new Button { Content = "Add Variable", Margin = new Avalonia.Thickness(0, 4, 0, 0) };
-        add.Click += (_, _) =>
-        {
-            GraphVariable variable = workspace.Editor.AddVariable("int");
-            focusVariableId = variable.Id;
-            ShowInspector();
-        };
-        InspectorPanel.Children.Add(add);
+        InspectorPanel.Children.Add(new TextBlock { Text = "VARIABLE", Classes = { "panelTitle" }, Margin = new Avalonia.Thickness(0, 14, 0, 4) });
+        AddVariableEditor(variable);
         InspectorPanel.Children.Add(new TextBlock
         {
-            Text = graph.Variables.Count == 0
-                ? "Variables hold values that change while the program runs."
-                : "Each variable has a Get and a Set node in the Variables category of the palette.",
+            Text = "Drag the variable from My Project onto the graph: hold Ctrl for its Get node or Alt for its Set node.",
             TextWrapping = TextWrapping.Wrap,
             Classes = { "secondary" },
             FontSize = 12,
@@ -73,7 +60,7 @@ public partial class MainWindow
         var name = new TextBox { Text = variable.Name, MinWidth = 0 };
         var type = new ComboBox
         {
-            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.DisplayName).ToList(),
+            ItemsSource = TypeNames(),
             SelectedItem = variable.Type,
             Width = 116,
             Margin = new Avalonia.Thickness(4, 0),
@@ -95,7 +82,7 @@ public partial class MainWindow
             : workspace!.Editor.Graph.Variables.Exists(other => other.Id != id && other.Name == text) ? $"Another variable is named '{text}'."
             : null;
         string? ValueProblem(string text) =>
-            TypeRef.FromName(variable.Type) is { } typeRef && LiteralValues.TryInitialValue(typeRef, text, out string? problem) is null ? problem : null;
+            TypeRef.FromName(variable.Type, workspace!.Project.GraphDocuments) is { } typeRef && LiteralValues.TryInitialValue(typeRef, text, out string? problem) is null ? problem : null;
         void Validate() => error.Text = NameProblem(name.Text ?? "") ?? ValueProblem(value.Text ?? "") ?? "";
 
         // Invalid names and values are still stored, like node values; the compiler reports them until they are fixed.

@@ -220,7 +220,7 @@ public sealed class FunctionTests
     {
         GraphBuilder square = Square();
         var program = new GraphBuilder();
-        var editor = new GraphEditor(program.Graph, Compiler.Library) { Functions = [square.Graph] };
+        var editor = new GraphEditor(program.Graph, Compiler.Library) { ProjectGraphs = [square.Graph] };
         NodeDefinition callDefinition = editor.AvailableDefinitions.Single(definition => definition.DisplayName == "Call Square");
         GraphNode call = editor.AddNode(callDefinition, 0, 0);
         Assert.Equal(square.Graph.Id, call.Properties[FunctionNodes.FunctionProperty]);
@@ -236,7 +236,7 @@ public sealed class FunctionTests
     public void ChangingTheSignatureDropsWiresThatNoLongerFitInOneUndoStep()
     {
         var function = GraphBuilder.Function("Show");
-        var editor = new GraphEditor(function.Graph, Compiler.Library) { Functions = [function.Graph] };
+        var editor = new GraphEditor(function.Graph, Compiler.Library) { ProjectGraphs = [function.Graph] };
         GraphParameter parameter = editor.AddParameter("string");
         GraphNode entry = editor.AddNode(FunctionNodes.EntryTypeId, 0, 0);
         GraphNode print = editor.AddNode("console.write-line", 300, 0);

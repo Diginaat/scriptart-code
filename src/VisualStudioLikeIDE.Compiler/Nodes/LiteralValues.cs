@@ -12,8 +12,9 @@ namespace VisualStudioLikeIDE.Compiler.Nodes;
 public static class LiteralValues
 {
     /// <summary>
-    /// The value a variable of <paramref name="type"/> starts with, given its initial value text: a literal, or a new empty list
-    /// for a list type, whose text must be blank. Null with an <paramref name="error"/> when the text does not fit the type.
+    /// The value a variable of <paramref name="type"/> starts with, given its initial value text: a literal, a new empty list for a
+    /// list type, or a new object for a class or struct of the project. The text of lists, classes, and structs must be blank.
+    /// Null with an <paramref name="error"/> when the text does not fit the type.
     /// </summary>
     public static IrExpression? TryInitialValue(TypeRef type, string text, out string? error)
     {
@@ -22,6 +23,12 @@ public static class LiteralValues
         if (type.IsList)
         {
             error = string.IsNullOrWhiteSpace(text) ? null : "A list always starts empty. Leave the initial value blank and add items with Add to List.";
+            return error is null ? new IrObjectCreation(type, []) : null;
+        }
+
+        if (type.IsProjectType)
+        {
+            error = string.IsNullOrWhiteSpace(text) ? null : $"A {type} always starts as a new {type} with its properties' initial values. Leave the initial value blank.";
             return error is null ? new IrObjectCreation(type, []) : null;
         }
 

@@ -19,7 +19,7 @@ namespace VisualStudioLikeIDE.App.Canvas;
 /// <remarks>
 /// Controls: left-drag a node to move it (with the selection), left-drag from a pin to connect (releasing on empty space raises
 /// <see cref="WireDropped"/> so the host can offer compatible nodes), left-drag on empty space to
-/// box-select, right- or middle-drag to pan, wheel to zoom, Alt+click a pin to disconnect it, Delete to remove the selection,
+/// box-select, right-click on empty space to open the action menu (<see cref="ActionMenuRequested"/>), right- or middle-drag to pan, wheel to zoom, Alt+click a pin to disconnect it, Delete to remove the selection,
 /// Ctrl+A to select all, double-click a value or press F2 to edit it in place, C to add a comment around the selection
 /// (drag its title to move it with the nodes inside, drag its corner to resize, double-click its title to rename),
 /// double-click a wire to add a reroute point (drag it to move, Alt+click to remove), click or drag on the minimap to move the view, Home to frame the graph, arrow keys to cycle selection.
@@ -93,6 +93,9 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
     /// <summary>A wire was dragged from a pin and released on empty space; the host offers nodes to create there.</summary>
     public event EventHandler<WireDroppedEventArgs>? WireDropped;
+
+    /// <summary>The user right-clicked empty space without dragging; the host offers nodes to create there.</summary>
+    public event EventHandler<ActionMenuRequestedEventArgs>? ActionMenuRequested;
 
     /// <summary>The user asked to rename a comment (double-click on its title, F2, or right after creating it).</summary>
     public event EventHandler<CommentEditRequestedEventArgs>? CommentEditRequested;
@@ -316,9 +319,9 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
         DrawMinimap(context, visibleWorld);
 
-        if (editor.Graph.Nodes.Count == 0)
+        if (editor.Graph.Nodes.Count == 0 && !Compiler.TypeSystem.TypeRef.IsTypeGraph(editor.Graph))
         {
-            FormattedText hint = Text("Empty graph. Double-click a node in the palette to add it.", CanvasTheme.FontSize, CanvasTheme.TypeLabel);
+            FormattedText hint = Text("Empty graph. Right-click to add a node.", CanvasTheme.FontSize, CanvasTheme.TypeLabel);
             context.DrawText(hint, new Point((Bounds.Width - hint.Width) / 2, (Bounds.Height - hint.Height) / 2));
         }
 
@@ -576,6 +579,10 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
                 // The pointer rests on the target pin; keep the hover from replacing the result message.
                 hoveredPin = target.Pin;
                 hoverMessage = PinMessage(target.Pin);
+                break;
+
+            case Gesture.Panning when !dragMoved && e.InitialPressMouseButton == MouseButton.Right && HitNode(ToWorld(lastScreen)) is null:
+                ActionMenuRequested?.Invoke(this, new ActionMenuRequestedEventArgs(ToWorld(lastScreen), lastScreen));
                 break;
 
             case Gesture.Connecting when connectFrom is not null && dragMoved && HitNode(connectCurrentWorld) is null:
@@ -1373,6 +1380,14 @@ internal sealed class ValueEditRequestedEventArgs(string nodeId, PropertyDefinit
     public PropertyDefinition Property { get; } = property;
 
     public Rect Screen { get; } = screen;
+}
+
+/// <summary>Where the action menu was requested, in graph and control coordinates.</summary>
+internal sealed class ActionMenuRequestedEventArgs(Point world, Point screen) : EventArgs
+{
+    public Point World { get; } = world;
+
+    public Point Screen { get; } = screen;
 }
 
 /// <summary>Where a wire from <see cref="Source"/> was released, in graph and control coordinates.</summary>

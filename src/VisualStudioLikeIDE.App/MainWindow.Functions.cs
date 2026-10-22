@@ -8,13 +8,10 @@ using VisualStudioLikeIDE.ProjectSystem;
 
 namespace VisualStudioLikeIDE.App;
 
-/// <summary>The Graphs list, adding function graphs, and the Function section of the Details panel.</summary>
+/// <summary>Adding function graphs, and the Function section of the Details panel.</summary>
 public partial class MainWindow
 {
     private const string NoReturnValue = "(none)";
-
-    // Rebuilding the list while it updates its selection would re-enter the selection handler.
-    private bool refreshingGraphList;
 
     // After adding a parameter, its name box takes focus once the panel has been rebuilt.
     private string? focusParameterId;
@@ -34,44 +31,6 @@ public partial class MainWindow
         SetStatus($"Added function {added.Graph.Name}. Rename it and add parameters in Details; call it from any graph with its Call node.");
     }
 
-    private void RefreshGraphList()
-    {
-        refreshingGraphList = true;
-        GraphList.Items.Clear();
-        if (workspace is not null)
-        {
-            foreach (ProjectGraph graph in workspace.Project.Graphs)
-            {
-                var item = new ListBoxItem
-                {
-                    Content = graph.Graph.Kind == GraphKind.Function ? $"ƒ  {graph.Graph.Name}" : $"▶  {graph.Graph.Name}",
-                    Tag = graph,
-                };
-                ToolTip.SetTip(item, graph.RelativePath);
-                GraphList.Items.Add(item);
-                if (graph == workspace.Graph)
-                {
-                    GraphList.SelectedItem = item;
-                }
-            }
-        }
-
-        refreshingGraphList = false;
-    }
-
-    private void OnGraphListSelectionChanged()
-    {
-        if (refreshingGraphList || workspace is null || (GraphList.SelectedItem as ListBoxItem)?.Tag is not ProjectGraph graph || graph == workspace.Graph)
-        {
-            return;
-        }
-
-        recompileTimer.Stop();
-        workspace.OpenGraph(graph);
-        ShowOpenGraph();
-        SetStatus($"Opened {graph.Graph.Name}.");
-    }
-
     private void AddFunctionEditors()
     {
         if (workspace is null || workspace.Editor.Graph.Kind != GraphKind.Function)
@@ -89,7 +48,7 @@ public partial class MainWindow
         {
             if (workspace?.Editor.Graph == graph && (name.Text ?? "") != graph.Name)
             {
-                workspace.Editor.RenameFunction(name.Text ?? "");
+                workspace.Editor.RenameGraph(name.Text ?? "");
             }
         }
 
@@ -103,7 +62,7 @@ public partial class MainWindow
 
         var returnType = new ComboBox
         {
-            ItemsSource = new[] { NoReturnValue }.Concat(TypeRef.VariableTypes.Select(type => type.DisplayName)).ToList(),
+            ItemsSource = new[] { NoReturnValue }.Concat(TypeNames()).ToList(),
             SelectedItem = graph.ReturnType ?? NoReturnValue,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
         };
@@ -150,7 +109,7 @@ public partial class MainWindow
         var name = new TextBox { Text = parameter.Name, MinWidth = 0 };
         var type = new ComboBox
         {
-            ItemsSource = TypeRef.VariableTypes.Select(candidate => candidate.DisplayName).ToList(),
+            ItemsSource = TypeNames(),
             SelectedItem = parameter.Type,
             Width = 116,
             Margin = new Avalonia.Thickness(4, 0),

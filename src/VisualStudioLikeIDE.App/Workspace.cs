@@ -14,7 +14,7 @@ internal sealed class Workspace
 {
     private readonly Dictionary<GraphDocument, GraphEditor> editors = [];
 
-    // Adding a function changes the project file, which no graph editor's undo history covers.
+    // Adding a graph changes the project file, which no graph editor's undo history covers.
     private bool projectChanged;
 
     // Referenced assemblies whose methods are in the node library.
@@ -87,24 +87,30 @@ internal sealed class Workspace
     }
 
     /// <summary>Adds a function graph with an unused name such as <c>Function1</c> and opens it.</summary>
-    public ProjectGraph AddFunction()
+    public ProjectGraph AddFunction() => Add(Project.AddFunction(UnusedName("Function")));
+
+    /// <summary>Adds a class or struct graph with an unused name such as <c>Class1</c> and opens it.</summary>
+    public ProjectGraph AddType(GraphKind kind) => Add(Project.AddType(UnusedName(kind.ToString()), kind));
+
+    private ProjectGraph Add(ProjectGraph added)
     {
-        string name = Enumerable.Range(1, int.MaxValue)
-            .Select(number => "Function" + number.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            .First(candidate => !Project.Graphs.Any(graph =>
-                string.Equals(graph.Graph.Name, candidate, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(graph.RelativePath)), candidate, StringComparison.OrdinalIgnoreCase)));
-        ProjectGraph added = Project.AddFunction(name);
         projectChanged = true;
-        IReadOnlyList<GraphDocument> functions = Project.Functions;
+        IReadOnlyList<GraphDocument> graphs = Project.GraphDocuments;
         foreach (GraphEditor editor in editors.Values)
         {
-            editor.Functions = functions;
+            editor.ProjectGraphs = graphs;
         }
 
         OpenGraph(added);
         return added;
     }
+
+    private string UnusedName(string prefix) =>
+        Enumerable.Range(1, int.MaxValue)
+            .Select(number => prefix + number.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .First(candidate => !Project.Graphs.Any(graph =>
+                string.Equals(graph.Graph.Name, candidate, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(graph.RelativePath)), candidate, StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>Compiles the open graph in memory. Nothing is written to disk.</summary>
     public GraphCompilationResult Compile()
@@ -127,7 +133,7 @@ internal sealed class Workspace
     {
         if (!editors.TryGetValue(graph.Graph, out GraphEditor? editor))
         {
-            editor = new GraphEditor(graph.Graph, Compiler.Library) { Functions = Project.Functions };
+            editor = new GraphEditor(graph.Graph, Compiler.Library) { ProjectGraphs = Project.GraphDocuments };
             editor.Changed += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
             editors.Add(graph.Graph, editor);
         }

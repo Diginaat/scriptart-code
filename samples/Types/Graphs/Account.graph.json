@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 6,
+  "id": "account",
+  "name": "Account",
+  "kind": "Class",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "owner",
+      "name": "Owner",
+      "type": "string",
+      "value": ""
+    },
+    {
+      "id": "balance",
+      "name": "Balance",
+      "type": "int",
+      "value": "0"
+    }
+  ]
+}

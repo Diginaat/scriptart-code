@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using AvaloniaEdit.Highlighting;
 using VisualStudioLikeIDE.NodeEditor;
 using VisualStudioLikeIDE.Compiler;
@@ -78,7 +79,7 @@ public sealed partial class MainWindow : Window
             }
         };
 
-        GraphList.SelectionChanged += (_, _) => OnGraphListSelectionChanged();
+        ProjectSearch.TextChanged += (_, _) => RefreshProjectPanel();
 
         ProblemsList.DoubleTapped += (_, _) => GoToDiagnostic(ProblemsList.SelectedItem as ListBoxItem);
         ProblemsList.KeyDown += (_, e) =>
@@ -100,11 +101,12 @@ public sealed partial class MainWindow : Window
 
         GraphCanvas.SelectionChanged += (_, _) => OnCanvasSelectionChanged();
         GraphCanvas.StatusChanged += (_, message) => SetStatus(message);
-        GraphCanvas.WireDropped += (_, e) => ShowQuickAdd(e);
+        GraphCanvas.WireDropped += (_, e) => ShowActionMenu(e);
+        GraphCanvas.ActionMenuRequested += (_, e) => ShowActionMenu(e);
         // Tunnel: runs before the canvas handles the press, so a double-click that opens the inline editor comes after this.
         GraphCanvas.AddHandler(PointerPressedEvent, (_, _) =>
         {
-            HideQuickAdd();
+            HideActionMenu();
             HideCommandPalette(focusGraph: false);
             EndInlineEdit(commit: true);
         }, RoutingStrategies.Tunnel);
@@ -129,35 +131,46 @@ public sealed partial class MainWindow : Window
             }
         }, RoutingStrategies.Tunnel);
 
-        QuickAddSearch.TextChanged += (_, _) => PopulateQuickAdd();
-        QuickAddSearch.KeyDown += (_, e) =>
+        ActionSearch.TextChanged += (_, _) => PopulateActionMenu();
+        ContextSensitiveBox.IsCheckedChanged += (_, _) =>
         {
-            if (e.Key == Key.Down && QuickAddList.ItemCount > 0)
+            PopulateActionMenu();
+            ActionSearch.Focus();
+        };
+        ActionSearch.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Down && FirstAction() is { } first)
             {
-                QuickAddList.SelectedIndex = 0;
-                (QuickAddList.ContainerFromIndex(0) as ListBoxItem)?.Focus();
+                ActionTree.SelectedItem = first;
+                first.Focus();
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
             {
-                AddNodeFromQuickAdd(QuickAddList.ItemCount > 0 ? QuickAddList.Items[0] as ListBoxItem : null);
+                AddNodeFromActionMenu(FirstAction());
                 e.Handled = true;
             }
         };
-        QuickAddList.Tapped += (_, _) => AddNodeFromQuickAdd(QuickAddList.SelectedItem as ListBoxItem);
-        QuickAddList.KeyDown += (_, e) =>
+        ActionTree.Tapped += (_, e) =>
+        {
+            if ((e.Source as Avalonia.Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true) is { Tag: NodeDefinition } item)
+            {
+                AddNodeFromActionMenu(item);
+            }
+        };
+        ActionTree.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Enter)
             {
-                AddNodeFromQuickAdd(QuickAddList.SelectedItem as ListBoxItem);
+                AddNodeFromActionMenu(ActionTree.SelectedItem as TreeViewItem);
                 e.Handled = true;
             }
         };
-        QuickAdd.KeyDown += (_, e) =>
+        ActionMenu.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape)
             {
-                HideQuickAdd();
+                HideActionMenu();
                 GraphCanvas.Focus();
                 e.Handled = true;
             }
@@ -437,10 +450,11 @@ public sealed partial class MainWindow : Window
     /// <summary>Shows the workspace's open graph in the canvas, palette, graph list, and panels.</summary>
     private void ShowOpenGraph()
     {
-        HideQuickAdd();
+        HideActionMenu();
         EndInlineEdit(commit: true);
         GraphCanvas.Editor = workspace!.Editor;
-        RefreshGraphList();
+        ShowTypeGraphHint();
+        RefreshProjectPanel();
         RefreshPaletteForVariables();
         ShowInspector();
         ShowCompilation(workspace.LastCompilation);
@@ -456,8 +470,9 @@ public sealed partial class MainWindow : Window
         UpdateTitle();
         UpdateCommandStates();
         ShowInspector();
+        ShowTypeGraphHint();
         RefreshPaletteForVariables();
-        RefreshGraphList();
+        RefreshProjectPanel();
     }
 
     private void Recompile()
@@ -557,6 +572,13 @@ public sealed partial class MainWindow : Window
 
     private void OnCanvasSelectionChanged()
     {
+        // A node selected on the graph replaces the variable selected in My Project in Details.
+        if (selectedVariableId is not null && GraphCanvas.SelectedItems.Count > 0)
+        {
+            selectedVariableId = null;
+            RefreshProjectPanel();
+        }
+
         ShowInspector();
         HighlightSelectedNodeCode();
         UpdateCommandStates();
@@ -630,7 +652,7 @@ public sealed partial class MainWindow : Window
         bool open = workspace is not null;
         bool idle = open && !busy && runningProgram is null;
         SaveButton.IsEnabled = SaveMenuItem.IsEnabled = open;
-        AddFunctionButton.IsEnabled = AddFunctionMenuItem.IsEnabled = open;
+        AddNewButton.IsEnabled = AddFunctionMenuItem.IsEnabled = AddClassMenuItem.IsEnabled = AddStructMenuItem.IsEnabled = open;
         UndoButton.IsEnabled = UndoMenuItem.IsEnabled = open && workspace!.Editor.CanUndo;
         RedoButton.IsEnabled = RedoMenuItem.IsEnabled = open && workspace!.Editor.CanRedo;
         ToolTip.SetTip(UndoButton, workspace?.Editor.UndoDescription is { } undo ? $"Undo {undo} (Ctrl+Z)" : "Undo (Ctrl+Z)");

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Types",
+  "rootNamespace": "Types",
+  "graphs": [
+    "Graphs/Program.graph.json",
+    "Graphs/Account.graph.json",
+    "Graphs/Point.graph.json"
+  ]
+}

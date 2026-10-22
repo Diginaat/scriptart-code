@@ -35,7 +35,7 @@ See `ConsoleReadLineNode`, `BranchNode`, and `ForLoopNode` in `src/VisualStudioL
 
 ## Nodes whose pins depend on the graph
 
-Most definitions are registered once and shared by every node of their type. Get and Set variable nodes are different: `NodeLibrary.Resolve(node, graph)` builds their definition from the variable the node refers to, so the title and pin types follow the variable. `NodeDefinition.InitialProperties` carries the variable id into new nodes. Everything that needs a node's definition (the compiler's `GraphIndex`, `GraphEditor.DefinitionOf`, the palette through `GraphEditor.AvailableDefinitions`) goes through this one method; Function Entry, Return Value, and call nodes use the same mechanism, building their pins from the function's signature.
+Most definitions are registered once and shared by every node of their type. Get and Set variable nodes are different: `NodeLibrary.Resolve(node, graph)` builds their definition from the variable the node refers to, so the title and pin types follow the variable. `NodeDefinition.InitialProperties` carries the variable id into new nodes. Everything that needs a node's definition (the compiler's `GraphIndex`, `GraphEditor.DefinitionOf`, the palette through `GraphEditor.AvailableDefinitions`) goes through this one method; Function Entry, Return Value, and call nodes use the same mechanism, building their pins from the function's signature, and so do the New, Get, Set, and With nodes of classes and structs (`TypeNodes`), building theirs from the type graph and property they name.
 
 ## Rules
 

@@ -23,7 +23,7 @@ public partial class MainWindow
 
     private void ShowPalette(List<PaletteCommand> commands, string placeholder)
     {
-        HideQuickAdd();
+        HideActionMenu();
         paletteCommands = commands;
         CommandSearch.PlaceholderText = placeholder;
         CommandSearch.Text = "";

@@ -59,13 +59,16 @@ public sealed class VisualProject
 
     public IReadOnlyList<ProjectGraph> Graphs => graphs;
 
-    /// <summary>The function graphs, in project order. Call nodes in every graph refer to these.</summary>
-    public IReadOnlyList<GraphDocument> Functions => [.. graphs.Select(graph => graph.Graph).Where(graph => graph.Kind == GraphKind.Function)];
+    /// <summary>Every graph document, in project order. Call nodes, type nodes, and type names refer to these.</summary>
+    public IReadOnlyList<GraphDocument> GraphDocuments => [.. graphs.Select(graph => graph.Graph)];
+
+    /// <summary>The function graphs, in project order.</summary>
+    public IReadOnlyList<GraphDocument> Functions => [.. GraphDocuments.Where(graph => graph.Kind == GraphKind.Function)];
 
     /// <summary>Compilation settings for every graph in the project.</summary>
     public GraphCompilationOptions CompilationOptions => new(
         Document.RootNamespace,
-        Functions,
+        GraphDocuments,
         graphs.FirstOrDefault(graph => graph.Graph.Kind == GraphKind.EntryPoint)?.Graph.Name ?? "Program");
 
     /// <summary>
@@ -75,21 +78,41 @@ public sealed class VisualProject
     /// </summary>
     public ProjectGraph AddFunction(string name)
     {
-        if (!GraphCompiler.IsValidIdentifier(name))
+        GraphDocument function = GraphDocument.CreateEmpty(name, GraphKind.Function);
+        function.Nodes.Add(new GraphNode { Id = GraphDocument.NewId(), Type = FunctionNodes.EntryTypeId, X = 0, Y = 0 });
+        return AddGraph(function);
+    }
+
+    /// <summary>
+    /// Adds a class or struct graph (<paramref name="kind"/>) named <paramref name="name"/>, with no properties, like
+    /// <see cref="AddFunction"/>.
+    /// </summary>
+    public ProjectGraph AddType(string name, GraphKind kind)
+    {
+        if (kind is not (GraphKind.Class or GraphKind.Struct))
         {
-            throw new ArgumentException($"'{name}' is not a valid function name. Use letters, digits, and underscores, starting with a letter.", nameof(name));
+            throw new ArgumentException($"{kind} is not a class or struct.", nameof(kind));
         }
 
-        string relativePath = $"{GraphsFolder}/{name}{GraphSerializer.FileExtension}";
-        if (graphs.Exists(graph => string.Equals(graph.RelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
+        return AddGraph(GraphDocument.CreateEmpty(name, kind));
+    }
+
+    private ProjectGraph AddGraph(GraphDocument graph)
+    {
+        string kind = graph.Kind.ToString().ToLowerInvariant();
+        if (!GraphCompiler.IsValidIdentifier(graph.Name))
+        {
+            throw new ArgumentException($"'{graph.Name}' is not a valid {kind} name. Use letters, digits, and underscores, starting with a letter.", nameof(graph));
+        }
+
+        string relativePath = $"{GraphsFolder}/{graph.Name}{GraphSerializer.FileExtension}";
+        if (graphs.Exists(existing => string.Equals(existing.RelativePath, relativePath, StringComparison.OrdinalIgnoreCase))
             || File.Exists(ResolveInside(DirectoryPath, relativePath)))
         {
             throw new IOException($"'{relativePath}' already exists. Choose a different name.");
         }
 
-        GraphDocument function = GraphDocument.CreateEmpty(name, GraphKind.Function);
-        function.Nodes.Add(new GraphNode { Id = GraphDocument.NewId(), Type = FunctionNodes.EntryTypeId, X = 0, Y = 0 });
-        var added = new ProjectGraph(relativePath, function);
+        var added = new ProjectGraph(relativePath, graph);
         graphs.Add(added);
         Document.Graphs.Add(relativePath);
         return added;

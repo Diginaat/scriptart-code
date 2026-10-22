@@ -49,6 +49,7 @@ public sealed class SerializationTests
 
         Assert.Equal(GraphDocument.CurrentSchemaVersion, graph.SchemaVersion);
         Assert.Empty(graph.Comments);
+        Assert.Empty(graph.Properties);
         Assert.Contains($"\"schemaVersion\": {GraphDocument.CurrentSchemaVersion}", GraphSerializer.Serialize(graph), StringComparison.Ordinal);
     }
 

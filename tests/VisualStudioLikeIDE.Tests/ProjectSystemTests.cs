@@ -48,6 +48,25 @@ public sealed class ProjectSystemTests
     }
 
     [Fact]
+    public void AddedTypesAreSavedReloadedAndGenerated()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject created = VisualProject.Create(directory.Path, "Hello");
+        ProjectGraph point = created.AddType("Point", GraphKind.Struct);
+        point.Graph.Properties.Add(new GraphProperty { Id = "x", Name = "X", Type = "double", Value = "1.5" });
+        Assert.Throws<IOException>(() => created.AddFunction("Point"));
+        Assert.Throws<ArgumentException>(() => created.AddType("Shape", GraphKind.Function));
+        created.Save();
+
+        VisualProject loaded = VisualProject.Load(created.ProjectFilePath);
+        ProjectGenerationResult result = loaded.Generate(Compiler);
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(GraphKind.Struct, loaded.Graphs[1].Graph.Kind);
+        Assert.Contains("public double X { get; set; } = 1.5;", File.ReadAllText(Path.Combine(directory.Path, "Generated", "Point.g.cs")), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GenerationNeverOverwritesHandwrittenFile()
     {
         using var directory = new TemporaryDirectory();

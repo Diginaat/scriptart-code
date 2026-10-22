@@ -73,6 +73,31 @@ internal sealed class GraphBuilder
         return node.Id;
     }
 
+    /// <summary>A class or struct graph with an id derived from its name; add properties with <see cref="Property"/>.</summary>
+    public static GraphBuilder Type(string name, GraphKind kind = GraphKind.Class) => new($"type-{name}", name, kind);
+
+    /// <summary>Declares a property of a class or struct and returns its id.</summary>
+    public string Property(string name, string type, string value = "")
+    {
+        var property = new GraphProperty { Id = $"p{nextId++}", Name = name, Type = type, Value = value };
+        graph.Properties.Add(property);
+        return property.Id;
+    }
+
+    /// <summary>Adds a type node (New, Get, Set, or With) for <paramref name="type"/> and, for property nodes, its property.</summary>
+    public string TypeNode(string typeId, GraphDocument type, string? propertyId = null)
+    {
+        var node = new GraphNode { Id = $"n{nextId++}", Type = typeId };
+        node.Properties["type"] = type.Id;
+        if (propertyId is not null)
+        {
+            node.Properties["property"] = propertyId;
+        }
+
+        graph.Nodes.Add(node);
+        return node.Id;
+    }
+
     /// <summary>Adds a Print Line node fed by a string literal and returns the print node id.</summary>
     public string PrintLiteral(string text)
     {

@@ -30,15 +30,18 @@ public static class FunctionNodes
 /// <summary>A function graph's signature, with every type resolved. Parameter ids double as pin ids.</summary>
 public sealed record FunctionSignature(string GraphId, string Name, IReadOnlyList<(string Id, string Name, TypeRef Type)> Parameters, TypeRef ReturnType)
 {
-    /// <summary>The signature of <paramref name="graph"/>, or null when it is not a function or uses an unsupported type.</summary>
-    public static FunctionSignature? Of(GraphDocument graph)
+    /// <summary>
+    /// The signature of <paramref name="graph"/>, whose types are resolved against <paramref name="projectGraphs"/>; null when it is
+    /// not a function or uses an unsupported type.
+    /// </summary>
+    public static FunctionSignature? Of(GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
-        TypeRef? returnType = graph.ReturnType is null ? TypeRef.Void : TypeRef.FromName(graph.ReturnType);
+        TypeRef? returnType = graph.ReturnType is null ? TypeRef.Void : TypeRef.FromName(graph.ReturnType, projectGraphs);
         List<(string, string, TypeRef)> parameters = [];
         foreach (GraphParameter parameter in graph.Parameters)
         {
-            if (TypeRef.FromName(parameter.Type) is not { } type)
+            if (TypeRef.FromName(parameter.Type, projectGraphs) is not { } type)
             {
                 return null;
             }

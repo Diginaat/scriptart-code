@@ -41,10 +41,16 @@ public static class GraphSerializer
             root["parameters"] = new JsonArray();
         }
 
+        if (version < 6)
+        {
+            // Version 6 added classes and structs, whose properties older files cannot have.
+            root["properties"] = new JsonArray();
+        }
+
         root["schemaVersion"] = GraphDocument.CurrentSchemaVersion;
 
         // An absent list means an empty one. Without this, the generated deserializer would set the list to null.
-        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters"])
+        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters", "properties"])
         {
             root[list] ??= new JsonArray();
         }

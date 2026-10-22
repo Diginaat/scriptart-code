@@ -62,7 +62,7 @@ internal sealed class MethodLowerer
         // Parameter names come first: they are part of the method's signature and must not be renamed.
         foreach (GraphParameter parameter in index.Graph.Parameters)
         {
-            if (TypeSystem.TypeRef.FromName(parameter.Type) is { } type)
+            if (TypeSystem.TypeRef.FromName(parameter.Type, index.ProjectGraphs) is { } type)
             {
                 lowerer.parameters.Add(parameter.Id, new IrLocal(lowerer.AllocateName(parameter.Name), type));
             }
@@ -76,9 +76,9 @@ internal sealed class MethodLowerer
     }
 
     /// <summary>The parameters of the method in declaration order, as generated.</summary>
-    internal static IReadOnlyList<IrParameter> Parameters(GraphDocument graph) =>
+    internal static IReadOnlyList<IrParameter> Parameters(GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs) =>
         [.. graph.Parameters
-            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromName(parameter.Type)))
+            .Select(parameter => (parameter.Name, Type: TypeSystem.TypeRef.FromName(parameter.Type, projectGraphs)))
             .Where(parameter => parameter.Type is not null)
             .Select(parameter => new IrParameter(parameter.Name, parameter.Type!))];
 
@@ -106,7 +106,7 @@ internal sealed class MethodLowerer
         foreach (GraphVariable variable in index.Graph.Variables)
         {
             ResolvedNode? firstWriter = writers.FirstOrDefault(node => ((VariableSetNode)node.Definition).VariableId == variable.Id);
-            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromName(variable.Type) is not { } type)
+            if ((!read.Contains(variable.Id) && firstWriter is null) || TypeSystem.TypeRef.FromName(variable.Type, index.ProjectGraphs) is not { } type)
             {
                 continue;
             }

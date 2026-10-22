@@ -109,6 +109,7 @@ public static class IrSimplifier
         IrBinary binary => HasSideEffects(binary.Left) || HasSideEffects(binary.Right),
         IrUnary unary => HasSideEffects(unary.Operand),
         IrConvert convert => HasSideEffects(convert.Operand),
+        IrWith copy => HasSideEffects(copy.Receiver) || HasSideEffects(copy.Value),
         _ => false,
     };
 }

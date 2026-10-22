@@ -11,11 +11,17 @@ namespace VisualStudioLikeIDE.Compiler;
 
 /// <summary>Settings shared by every graph in a project.</summary>
 /// <param name="RootNamespace">Namespace of the generated types.</param>
-/// <param name="Functions">The project's function graphs. Call nodes refer to them, and they become methods of <paramref name="HostClass"/>.</param>
+/// <param name="Graphs">
+/// The project's graphs. Call nodes refer to its functions, which become methods of <paramref name="HostClass"/>, and types name
+/// its classes and structs.
+/// </param>
 /// <param name="HostClass">The class generated from the entry graph, which also holds every function.</param>
-public sealed record GraphCompilationOptions(string RootNamespace, IReadOnlyList<GraphDocument>? Functions = null, string HostClass = "Program")
+public sealed record GraphCompilationOptions(string RootNamespace, IReadOnlyList<GraphDocument>? Graphs = null, string HostClass = "Program")
 {
-    public IReadOnlyList<GraphDocument> Functions { get; init; } = Functions ?? [];
+    public IReadOnlyList<GraphDocument> Graphs { get; init; } = Graphs ?? [];
+
+    /// <summary>The function graphs among <see cref="Graphs"/>.</summary>
+    public IReadOnlyList<GraphDocument> Functions => [.. Graphs.Where(graph => graph.Kind == GraphKind.Function)];
 }
 
 /// <summary>
@@ -68,14 +74,14 @@ public sealed class GraphCompiler(NodeLibrary library)
     public static bool IsValidNamespace(string name) =>
         !string.IsNullOrEmpty(name) && name.Split('.').All(IsValidIdentifier);
 
-    private static void ValidateVariables(GraphDocument graph, List<GraphDiagnostic> diagnostics)
+    private static void ValidateVariables(GraphDocument graph, GraphCompilationOptions options, List<GraphDiagnostic> diagnostics)
     {
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (GraphVariable variable in graph.Variables)
         {
             string? problem = !IsValidIdentifier(variable.Name) ? $"Variable '{variable.Name}' does not have a valid C# name."
                 : !names.Add(variable.Name) ? $"More than one variable is named '{variable.Name}'."
-                : TypeRef.FromName(variable.Type) is not { } type ? $"Variable '{variable.Name}' has the unsupported type '{variable.Type}'."
+                : TypeRef.FromName(variable.Type, options.Graphs) is not { } type ? $"Variable '{variable.Name}' has the unsupported type '{variable.Type}'."
                 : LiteralValues.TryInitialValue(type, variable.Value, out string? error) is null ? $"Variable '{variable.Name}': initial value: {error}"
                 : null;
             if (problem is not null)
@@ -102,7 +108,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             Problem($"More than one function is named '{graph.Name}'.");
         }
 
-        if (graph.ReturnType is not null && TypeRef.FromName(graph.ReturnType) is null)
+        if (graph.ReturnType is not null && TypeRef.FromName(graph.ReturnType, options.Graphs) is null)
         {
             Problem($"Function '{graph.Name}' has the unsupported return type '{graph.ReturnType}'.");
         }
@@ -114,7 +120,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             string? problem = !IsValidIdentifier(parameter.Name) ? $"Parameter '{parameter.Name}' does not have a valid C# name."
                 : !parameterNames.Add(parameter.Name) ? $"More than one parameter is named '{parameter.Name}'."
                 : variableNames.Contains(parameter.Name) ? $"Parameter '{parameter.Name}' has the same name as a variable."
-                : TypeRef.FromName(parameter.Type) is null ? $"Parameter '{parameter.Name}' has the unsupported type '{parameter.Type}'."
+                : TypeRef.FromName(parameter.Type, options.Graphs) is null ? $"Parameter '{parameter.Name}' has the unsupported type '{parameter.Type}'."
                 : null;
             if (problem is not null)
             {
@@ -123,8 +129,93 @@ public sealed class GraphCompiler(NodeLibrary library)
         }
     }
 
+    /// <summary>
+    /// A class or struct: one property per graph property, with its initial value. Checks names, types, and that no type contains
+    /// itself through its properties.
+    /// </summary>
+    private static IrClass? LowerType(GraphDocument graph, GraphCompilationOptions options, List<GraphDiagnostic> diagnostics)
+    {
+        string kind = graph.Kind == GraphKind.Struct ? "struct" : "class";
+        void Problem(string message) => diagnostics.Add(new(DiagnosticIds.InvalidType, DiagnosticSeverity.Error, message, graph.Id));
+
+        if (!IsValidIdentifier(graph.Name))
+        {
+            Problem($"'{graph.Name}' is not a valid C# {kind} name.");
+        }
+        else if (graph.Name == options.HostClass || options.Graphs.Count(other => other.Name == graph.Name) > 1)
+        {
+            // Each graph generates {Name}.g.cs, so a function of the same name would also clash.
+            Problem($"Another graph is named '{graph.Name}'.");
+        }
+
+        if (graph.Nodes.Count > 0)
+        {
+            Problem($"A {kind} graph has properties, not nodes. Delete its {graph.Nodes.Count} node(s).");
+        }
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        List<IrProperty> properties = [];
+        foreach (GraphProperty property in graph.Properties)
+        {
+            TypeRef? type = TypeRef.FromName(property.Type, options.Graphs);
+            string? error = null;
+            IrExpression? initial = type is null ? null : LiteralValues.TryInitialValue(type, property.Value, out error);
+            string? problem = !IsValidIdentifier(property.Name) ? $"Property '{property.Name}' does not have a valid C# name."
+                : !names.Add(property.Name) ? $"More than one property is named '{property.Name}'."
+                : property.Name == graph.Name ? $"Property '{property.Name}' cannot have the name of its {kind}."
+                : type is null ? $"Property '{property.Name}' has the unsupported type '{property.Type}'."
+                : initial is null ? $"Property '{property.Name}': initial value: {error}"
+                : type.IsProjectType && Contains(type.Name, graph.Name, options.Graphs) ? $"Property '{property.Name}' makes {graph.Name} contain itself, so a {graph.Name} could never be created."
+                : null;
+            if (problem is not null)
+            {
+                Problem(problem);
+            }
+            else
+            {
+                properties.Add(new IrProperty(property.Name, type!, IsDefaultValue(initial!) ? null : initial));
+            }
+        }
+
+        return new IrClass(options.RootNamespace, graph.Name, [], graph.Id,
+            Kind: graph.Kind == GraphKind.Struct ? IrClassKind.Struct : IrClassKind.Class, Properties: properties);
+    }
+
+    /// <summary>True when the type named <paramref name="typeName"/> is, or has a property that contains, the type named <paramref name="target"/>.</summary>
+    private static bool Contains(string typeName, string target, IReadOnlyList<GraphDocument> graphs)
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>([typeName]);
+        while (pending.TryPop(out string? name))
+        {
+            if (name == target)
+            {
+                return true;
+            }
+
+            if (visited.Add(name) && graphs.FirstOrDefault(graph => TypeRef.IsTypeGraph(graph) && graph.Name == name) is { } type)
+            {
+                foreach (GraphProperty property in type.Properties)
+                {
+                    pending.Push(property.Type);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>True for the value C# gives a property without an initializer: false, 0, or 0.0.</summary>
+    private static bool IsDefaultValue(IrExpression value) =>
+        value is IrLiteral { Value: false or 0 } || (value is IrLiteral { Value: double number } && number == 0 && !double.IsNegative(number));
+
     private IrClass? Lower(GraphDocument graph, GraphCompilationOptions options, List<GraphDiagnostic> diagnostics)
     {
+        if (TypeRef.IsTypeGraph(graph))
+        {
+            return LowerType(graph, options, diagnostics);
+        }
+
         bool isFunction = graph.Kind == GraphKind.Function;
         if (!isFunction && graph.Kind != GraphKind.EntryPoint)
         {
@@ -148,8 +239,8 @@ public sealed class GraphCompiler(NodeLibrary library)
                 $"Root namespace '{options.RootNamespace}' is not a valid C# namespace.", graph.Id));
         }
 
-        ValidateVariables(graph, diagnostics);
-        GraphIndex index = GraphIndex.Build(graph, Library, diagnostics, options.Functions);
+        ValidateVariables(graph, options, diagnostics);
+        GraphIndex index = GraphIndex.Build(graph, Library, diagnostics, options.Graphs);
 
         List<ResolvedNode> entries = [.. index.Nodes.Where(node => isFunction ? node.Definition is FunctionEntryNode : node.Definition is EntryNode)];
         if (isFunction)
@@ -179,7 +270,7 @@ public sealed class GraphCompiler(NodeLibrary library)
             return null;
         }
 
-        TypeRef returnType = isFunction ? TypeRef.FromName(graph.ReturnType) ?? TypeRef.Void : TypeRef.Void;
+        TypeRef returnType = isFunction ? TypeRef.FromName(graph.ReturnType, options.Graphs) ?? TypeRef.Void : TypeRef.Void;
         IrBlock? body = MethodLowerer.LowerBody(index, entries[0], diagnostics, returnType);
         if (body is null)
         {
@@ -193,7 +284,7 @@ public sealed class GraphCompiler(NodeLibrary library)
         }
 
         IrMethod method = isFunction
-            ? new IrMethod(graph.Name, returnType, MethodLowerer.Parameters(graph), body, graph.Id, IsPrivate: true)
+            ? new IrMethod(graph.Name, returnType, MethodLowerer.Parameters(graph, options.Graphs), body, graph.Id, IsPrivate: true)
             : new IrMethod("Main", TypeRef.Void, [], body, graph.Id);
         IrSimplifier.Simplify(method);
 

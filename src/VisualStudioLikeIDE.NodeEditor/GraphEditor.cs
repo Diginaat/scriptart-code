@@ -1,5 +1,6 @@
 using VisualStudioLikeIDE.Compiler.Lowering;
 using VisualStudioLikeIDE.Compiler.Nodes;
+using VisualStudioLikeIDE.Compiler.TypeSystem;
 using VisualStudioLikeIDE.GraphModel;
 
 namespace VisualStudioLikeIDE.NodeEditor;
@@ -45,10 +46,11 @@ public sealed partial class GraphEditor
     public NodeLibrary Library { get; }
 
     /// <summary>
-    /// The project's function graphs, which call nodes refer to. The owner keeps this current when functions are added;
-    /// renaming a function or changing its signature needs no update, because call nodes resolve against the live documents.
+    /// The project's graphs: the functions that call nodes refer to and the classes and structs that types name. The owner keeps
+    /// this current when graphs are added; renaming a function or type or changing its signature or properties needs no update,
+    /// because nodes resolve against the live documents.
     /// </summary>
-    public IReadOnlyList<GraphDocument> Functions { get; set; } = [];
+    public IReadOnlyList<GraphDocument> ProjectGraphs { get; set; } = [];
 
     public bool CanUndo => undo.Count > 0;
 
@@ -66,11 +68,15 @@ public sealed partial class GraphEditor
     public NodeDefinition? DefinitionOf(GraphNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        return Library.Resolve(node, Graph, Functions);
+        return Library.Resolve(node, Graph, ProjectGraphs);
     }
 
-    /// <summary>Every node that can be added to this graph, including variable nodes and a call node per function.</summary>
-    public IEnumerable<NodeDefinition> AvailableDefinitions => Library.DefinitionsFor(Graph, Functions);
+    /// <summary>Every node that can be added to this graph, including variable nodes, a call node per function, and type nodes.</summary>
+    public IEnumerable<NodeDefinition> AvailableDefinitions => Library.DefinitionsFor(Graph, ProjectGraphs);
+
+    /// <summary>The type with this C# name among the simple types, lists, and the project's classes and structs.</summary>
+    private TypeRef ResolveType(string type, string kind) =>
+        TypeRef.FromName(type, ProjectGraphs) ?? throw new ArgumentException($"Unsupported {kind} type '{type}'.", nameof(type));
 
     public GraphNode AddNode(string typeId, double x, double y) => AddNode(FindDefinition(typeId), x, y);
 

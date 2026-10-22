@@ -20,12 +20,16 @@ public sealed class GraphIndex
     private readonly Dictionary<PinRef, List<GraphConnection>> byOutput = [];
     private readonly Dictionary<PinRef, List<GraphConnection>> byInput = [];
 
-    private GraphIndex(GraphDocument graph)
+    private GraphIndex(GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs)
     {
         Graph = graph;
+        ProjectGraphs = projectGraphs;
     }
 
     public GraphDocument Graph { get; }
+
+    /// <summary>The project's graphs: the functions that call nodes refer to and the classes and structs that types name.</summary>
+    public IReadOnlyList<GraphDocument> ProjectGraphs { get; }
 
     public IEnumerable<ResolvedNode> Nodes => nodes.Values;
 
@@ -61,17 +65,17 @@ public sealed class GraphIndex
     /// Resolves node definitions and checks every connection. Problems are reported to <paramref name="diagnostics"/>
     /// and the offending elements are left out of the index.
     /// </summary>
-    /// <param name="functions">The project's function graphs, which call nodes refer to.</param>
-    public static GraphIndex Build(GraphDocument graph, NodeLibrary library, List<GraphDiagnostic> diagnostics, IReadOnlyList<GraphDocument>? functions = null)
+    /// <param name="projectGraphs">The project's graphs, which call nodes, type nodes, and type names refer to.</param>
+    public static GraphIndex Build(GraphDocument graph, NodeLibrary library, List<GraphDiagnostic> diagnostics, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        var index = new GraphIndex(graph);
+        var index = new GraphIndex(graph, projectGraphs ?? []);
         foreach (GraphNode node in graph.Nodes)
         {
-            index.AddNode(node, library, functions, diagnostics);
+            index.AddNode(node, library, diagnostics);
         }
 
         var seen = new HashSet<GraphConnection>();
@@ -90,7 +94,7 @@ public sealed class GraphIndex
         return index;
     }
 
-    private void AddNode(GraphNode node, NodeLibrary library, IReadOnlyList<GraphDocument>? functions, List<GraphDiagnostic> diagnostics)
+    private void AddNode(GraphNode node, NodeLibrary library, List<GraphDiagnostic> diagnostics)
     {
         if (nodes.ContainsKey(node.Id))
         {
@@ -99,7 +103,7 @@ public sealed class GraphIndex
             return;
         }
 
-        NodeDefinition? definition = library.Resolve(node, Graph, functions);
+        NodeDefinition? definition = library.Resolve(node, Graph, ProjectGraphs);
         if (definition is null && node.Type is VariableNodes.GetTypeId or VariableNodes.SetTypeId)
         {
             diagnostics.Add(new(DiagnosticIds.UnknownVariable, DiagnosticSeverity.Error,
@@ -112,6 +116,13 @@ public sealed class GraphIndex
             diagnostics.Add(new(DiagnosticIds.UnknownFunction, DiagnosticSeverity.Error, node.Type == FunctionNodes.CallTypeId
                 ? "This node calls a function that is no longer in the project, or whose signature uses an unsupported type."
                 : "This node only belongs in a function graph, and Return Value only in a function that returns a value.", Graph.Id, node.Id));
+            return;
+        }
+
+        if (definition is null && TypeNodes.IsTypeNode(node.Type))
+        {
+            diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
+                "This node refers to a class, struct, or property that is no longer in the project, or whose type is not supported.", Graph.Id, node.Id));
             return;
         }
 

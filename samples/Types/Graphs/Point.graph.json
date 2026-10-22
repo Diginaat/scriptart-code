@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 6,
+  "id": "point",
+  "name": "Point",
+  "kind": "Struct",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "x",
+      "name": "X",
+      "type": "int",
+      "value": "0"
+    },
+    {
+      "id": "y",
+      "name": "Y",
+      "type": "int",
+      "value": "0"
+    }
+  ]
+}
