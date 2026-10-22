@@ -146,6 +146,8 @@ public sealed class WhileLoopNode() : StatementNodeDefinition(
         PinDefinition.ExecutionOut("completed", "Completed"),
     ])
 {
+    public override bool EvaluatesInputsOnce => false;
+
     public override void Lower(StatementLoweringContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -168,6 +170,8 @@ public sealed class ForLoopNode() : StatementNodeDefinition(
         PinDefinition.ExecutionOut("completed", "Completed"),
     ])
 {
+    public override bool EvaluatesInputsOnce => false;
+
     public override void Lower(StatementLoweringContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

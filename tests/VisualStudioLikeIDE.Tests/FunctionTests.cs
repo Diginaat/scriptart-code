@@ -260,6 +260,22 @@ public sealed class FunctionTests
     }
 
     [Fact]
+    public void WiresToADeletedParameterOnCallNodesInOtherGraphsAreReported()
+    {
+        GraphBuilder square = Square();
+        var program = new GraphBuilder();
+        string call = program.Call(square.Graph);
+        program.Then(program.Node(BuiltInNodes.EntryTypeId), call)
+            .Connect(program.Node("literal.int", "7"), "value", call, square.Graph.Parameters[0].Id);
+        square.Graph.Parameters.Clear();
+
+        GraphCompilationResult result = Compile(program, square);
+
+        Assert.False(result.Success);
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.IsError && diagnostic.NodeId == call);
+    }
+
+    [Fact]
     public void SignatureRoundTripsAndOlderFilesHaveNoParameters()
     {
         GraphDocument loaded = GraphSerializer.Deserialize(GraphSerializer.Serialize(Square().Graph));

@@ -112,4 +112,10 @@ public abstract class StatementNodeDefinition : NodeDefinition
     }
 
     public abstract void Lower(StatementLoweringContext context);
+
+    /// <summary>
+    /// True when the generated statement evaluates each input once, so a value used by several inputs can be computed once into a
+    /// local before the statement. False for loops, whose inputs are evaluated again on every iteration.
+    /// </summary>
+    public virtual bool EvaluatesInputsOnce => true;
 }

@@ -12,7 +12,8 @@ namespace VisualStudioLikeIDE.Compiler.Lowering;
 /// <remarks>
 /// Statement nodes are visited in execution order. After each node, lowering continues at its immediate post-dominator,
 /// which turns reconverging branches into ordinary <c>if</c>/<c>else</c> statements followed by the shared continuation.
-/// Pure nodes are inlined as expressions where they are used. Values produced by statement nodes live in locals and are
+/// Pure nodes are inlined as expressions where they are used. A pure node that one statement uses more than once is computed
+/// once into a local declared just before that statement. Values produced by statement nodes live in locals and are
 /// only visible in the block that declares them and its nested blocks, matching C# scoping.
 /// </remarks>
 internal sealed class MethodLowerer
@@ -28,6 +29,9 @@ internal sealed class MethodLowerer
     private readonly Dictionary<string, IrLocal> variables = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IrLocal> parameters = new(StringComparer.Ordinal);
     private int loopDepth;
+
+    // The statement being lowered: where shared pure values are declared, and how often each pure node feeds it.
+    private (string NodeId, IrBlock Block, Dictionary<string, int> Uses, Dictionary<string, IrLocal> Hoisted)? statement;
 
     private MethodLowerer(GraphIndex index, ExecutionFlow flow, List<GraphDiagnostic> diagnostics, TypeSystem.TypeRef returnType)
     {
@@ -220,9 +224,12 @@ internal sealed class MethodLowerer
                 break;
             }
 
-            if (current.Definition is StatementNodeDefinition statement)
+            if (current.Definition is StatementNodeDefinition definition)
             {
-                statement.Lower(new StatementLoweringContext(this, current, block));
+                var outer = statement;
+                statement = (current.Id, block, definition.EvaluatesInputsOnce ? CountPureUses(current) : [], []);
+                definition.Lower(new StatementLoweringContext(this, current, block));
+                statement = outer;
             }
 
             current = flow.ImmediatePostDominator(current);
@@ -240,11 +247,61 @@ internal sealed class MethodLowerer
             return new IrError(definition.Output.DataType!);
         }
 
+        if (statement is { } current && current.Hoisted.TryGetValue(node.Id, out IrLocal? hoisted))
+        {
+            pureNodesInProgress.Remove(node.Id);
+            return new IrLocalReference(hoisted);
+        }
+
         loweredPureNodes.Add(node.Id);
         IrExpression expression = definition.Lower(ExpressionLoweringContext.Create(this, node));
         pureNodesInProgress.Remove(node.Id);
+
+        // A node without inputs (a literal or a variable read) is as cheap and readable inline as a local would be.
+        if (statement is { } shared && shared.Uses.GetValueOrDefault(node.Id) > 1 && HasDataInputs(node) && expression is not IrError)
+        {
+            string hint = definition.Output.DisplayName.Length > 0
+                ? char.ToLowerInvariant(definition.Output.DisplayName[0]) + definition.Output.DisplayName[1..].Replace(" ", "", StringComparison.Ordinal)
+                : "value";
+            IrLocal local = NewLocal(hint, expression.Type);
+            shared.Block.Statements.Add(new IrLocalDeclaration(local, expression) { SourceNodeId = shared.NodeId });
+            shared.Hoisted.Add(node.Id, local);
+            return new IrLocalReference(local);
+        }
+
         return expression;
     }
+
+    /// <summary>
+    /// How many inputs each pure node feeds within the expressions of <paramref name="node"/>. A pure node's own inputs are
+    /// counted once, because it is lowered once however many times it is used.
+    /// </summary>
+    private Dictionary<string, int> CountPureUses(ResolvedNode node)
+    {
+        Dictionary<string, int> uses = new(StringComparer.Ordinal);
+        void Visit(ResolvedNode consumer)
+        {
+            foreach (PinDefinition pin in consumer.Definition.Pins.Where(pin => pin.DataType is not null && pin.Direction == PinDirection.Input))
+            {
+                if (index.ConnectionsTo(new PinRef(consumer.Id, pin.Id)) is [var connection, ..]
+                    && index.Find(connection.From.Node) is { Definition: PureNodeDefinition } source)
+                {
+                    int count = uses.GetValueOrDefault(source.Id);
+                    uses[source.Id] = count + 1;
+                    if (count == 0)
+                    {
+                        Visit(source);
+                    }
+                }
+            }
+        }
+
+        Visit(node);
+        return uses;
+    }
+
+    private static bool HasDataInputs(ResolvedNode node) =>
+        node.Definition.Pins.Any(pin => pin.DataType is not null && pin.Direction == PinDirection.Input);
 
     private IrExpression LookUpLocal(PinRef output, PinRef consumer)
     {

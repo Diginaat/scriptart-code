@@ -22,9 +22,11 @@ Done: loops. While Loop and For Loop nodes have a Loop Body output and a Complet
 
 Done: function graphs (graph schema version 5). File → Add Function, or **+ Function** in the Graphs list, adds a function graph; selecting a graph in the list opens it, and each graph keeps its own undo history. The Details panel edits the function's name, return type, and parameters. Function Entry outputs the parameters, Return Value returns a value, and a Call node per function appears in the palette of every graph, including the function itself for recursion. Each function generates a `private static` method in its own `.g.cs` file. See the `Functions` sample.
 
+Done: shared-subexpression hoisting. A value one statement uses more than once is computed once into a local before it (D-018).
+
 Next: `foreach` over collections, which needs collection types first.
 
-Remaining: `foreach` over collections; classes, structs, properties; collections and generics; exceptions; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures; shared-subexpression hoisting.
+Remaining: `foreach` over collections; classes, structs, properties; collections and generics; exceptions; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
 
 ## Phase 4 — Code quality and IDE integration
 

@@ -74,5 +74,5 @@ If any stage reports an error, no C# is produced and nothing is written.
 ## Known limitations
 
 - One method per graph: the entry graph becomes `Program.Main`, each function graph a `private static` method of the same `partial class Program`, in its own file. Classes are not supported yet. Variables are method-wide; there are no block-scoped variables yet.
-- A pure node used by several inputs is inlined at each use. This is correct for side-effect-free nodes but duplicates work; hoisting shared subexpressions into locals is planned.
+- A pure node with inputs that one statement uses more than once is computed once into a local declared before that statement. A pure node used by several statements, or by a loop's condition, is still inlined at each use, because a variable it reads may change in between.
 - Constant conditions produce Roslyn warnings (for example CS0162) rather than being folded.
