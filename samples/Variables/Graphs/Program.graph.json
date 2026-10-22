@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 4,
+  "id": "variables-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    { "id": "entry", "type": "core.entry", "x": 0, "y": 0, "properties": {} },
+    { "id": "ask", "type": "console.write-line", "x": 220, "y": 0, "properties": {} },
+    { "id": "question", "type": "literal.string", "x": 220, "y": 120, "properties": { "value": "What is your name?" } },
+    { "id": "read", "type": "console.read-line", "x": 440, "y": 0, "properties": {} },
+    { "id": "store-name", "type": "variable.set", "x": 660, "y": 0, "properties": { "variable": "name" } },
+    { "id": "count-greeting", "type": "variable.set", "x": 880, "y": 0, "properties": { "variable": "greetings" } },
+    { "id": "greetings-before", "type": "variable.get", "x": 660, "y": 160, "properties": { "variable": "greetings" } },
+    { "id": "one", "type": "literal.int", "x": 660, "y": 240, "properties": { "value": "1" } },
+    { "id": "increment", "type": "math.int.add", "x": 880, "y": 160, "properties": {} },
+    { "id": "greet", "type": "console.write-line", "x": 1100, "y": 0, "properties": {} },
+    { "id": "hello", "type": "literal.string", "x": 880, "y": 320, "properties": { "value": "Hello, " } },
+    { "id": "current-name", "type": "variable.get", "x": 880, "y": 420, "properties": { "variable": "name" } },
+    { "id": "hello-name", "type": "string.concat", "x": 1100, "y": 320, "properties": {} },
+    { "id": "report", "type": "console.write-line", "x": 1320, "y": 0, "properties": {} },
+    { "id": "so-far", "type": "literal.string", "x": 1100, "y": 500, "properties": { "value": "Greetings so far: " } },
+    { "id": "greetings-now", "type": "variable.get", "x": 1100, "y": 600, "properties": { "variable": "greetings" } },
+    { "id": "greetings-text", "type": "convert.int-to-string", "x": 1320, "y": 600, "properties": {} },
+    { "id": "report-text", "type": "string.concat", "x": 1320, "y": 480, "properties": {} }
+  ],
+  "connections": [
+    { "from": { "node": "entry", "pin": "then" }, "to": { "node": "ask", "pin": "exec" } },
+    { "from": { "node": "question", "pin": "value" }, "to": { "node": "ask", "pin": "text" } },
+    { "from": { "node": "ask", "pin": "then" }, "to": { "node": "read", "pin": "exec" } },
+    { "from": { "node": "read", "pin": "then" }, "to": { "node": "store-name", "pin": "exec" } },
+    { "from": { "node": "read", "pin": "line" }, "to": { "node": "store-name", "pin": "value" } },
+    { "from": { "node": "store-name", "pin": "then" }, "to": { "node": "count-greeting", "pin": "exec" } },
+    { "from": { "node": "greetings-before", "pin": "value" }, "to": { "node": "increment", "pin": "a" } },
+    { "from": { "node": "one", "pin": "value" }, "to": { "node": "increment", "pin": "b" } },
+    { "from": { "node": "increment", "pin": "result" }, "to": { "node": "count-greeting", "pin": "value" } },
+    { "from": { "node": "count-greeting", "pin": "then" }, "to": { "node": "greet", "pin": "exec" } },
+    { "from": { "node": "hello", "pin": "value" }, "to": { "node": "hello-name", "pin": "a" } },
+    { "from": { "node": "current-name", "pin": "value" }, "to": { "node": "hello-name", "pin": "b" } },
+    { "from": { "node": "hello-name", "pin": "result" }, "to": { "node": "greet", "pin": "text" } },
+    { "from": { "node": "greet", "pin": "then" }, "to": { "node": "report", "pin": "exec" } },
+    { "from": { "node": "so-far", "pin": "value" }, "to": { "node": "report-text", "pin": "a" } },
+    { "from": { "node": "greetings-now", "pin": "value" }, "to": { "node": "greetings-text", "pin": "value" } },
+    { "from": { "node": "greetings-text", "pin": "text" }, "to": { "node": "report-text", "pin": "b" } },
+    { "from": { "node": "report-text", "pin": "result" }, "to": { "node": "report", "pin": "text" } }
+  ],
+  "comments": [],
+  "variables": [
+    { "id": "name", "name": "name", "type": "string", "value": "" },
+    { "id": "greetings", "name": "greetings", "type": "int", "value": "0" }
+  ]
+}

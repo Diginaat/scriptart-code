@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Headless front end for CI and scripting: generate, build, and run visual projects without the editor. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>vside</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VisualStudioLikeIDE.ProjectSystem\VisualStudioLikeIDE.ProjectSystem.csproj" />
+  </ItemGroup>
+</Project>

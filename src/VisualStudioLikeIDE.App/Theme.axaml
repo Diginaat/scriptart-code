@@ -1,0 +1,51 @@
+<!-- Shared design tokens and control styles for the dark IDE theme. Canvas colors live in Canvas/CanvasTheme.cs. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <SolidColorBrush x:Key="IdeWindowBackground" Color="#1B1C1F" />
+    <SolidColorBrush x:Key="IdePanelBackground" Color="#222327" />
+    <SolidColorBrush x:Key="IdePanelHeaderBackground" Color="#2A2B30" />
+    <SolidColorBrush x:Key="IdeBorder" Color="#34363C" />
+    <SolidColorBrush x:Key="IdeTextSecondary" Color="#9DA1AA" />
+    <SolidColorBrush x:Key="IdeAccent" Color="#4C8DFF" />
+    <SolidColorBrush x:Key="IdeError" Color="#F06A6A" />
+    <SolidColorBrush x:Key="IdeWarning" Color="#E8B44C" />
+  </Styles.Resources>
+
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{StaticResource IdePanelBackground}" />
+    <Setter Property="BorderBrush" Value="{StaticResource IdeBorder}" />
+  </Style>
+  <Style Selector="TextBlock.panelTitle">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{StaticResource IdeTextSecondary}" />
+    <Setter Property="Margin" Value="10,8,10,6" />
+  </Style>
+  <Style Selector="TextBlock.secondary">
+    <Setter Property="Foreground" Value="{StaticResource IdeTextSecondary}" />
+  </Style>
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="{StaticResource IdeBorder}" />
+  </Style>
+  <Style Selector="Button.toolbar">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="Margin" Value="2,0" />
+    <Setter Property="MinHeight" Value="30" />
+  </Style>
+  <Style Selector="ListBox.palette ListBoxItem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector="ListBox.problems ListBoxItem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="10,4" />
+  </Style>
+  <Style Selector="TabControl.bottom TabItem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="12,0" />
+  </Style>
+</Styles>

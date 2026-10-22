@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "hello-world-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    { "id": "entry", "type": "core.entry", "x": 0, "y": 0, "properties": {} },
+    { "id": "print", "type": "console.write-line", "x": 240, "y": 0, "properties": {} },
+    { "id": "greeting", "type": "literal.string", "x": 0, "y": 120, "properties": { "value": "Hello, World!" } }
+  ],
+  "connections": [
+    { "from": { "node": "entry", "pin": "then" }, "to": { "node": "print", "pin": "exec" } },
+    { "from": { "node": "greeting", "pin": "value" }, "to": { "node": "print", "pin": "text" } }
+  ]
+}

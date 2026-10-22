@@ -1,0 +1,530 @@
+{
+  "schemaVersion": 5,
+  "id": "loops-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": -333,
+      "y": -27,
+      "properties": {}
+    },
+    {
+      "id": "count-up",
+      "type": "flow.for",
+      "x": -132,
+      "y": -27,
+      "properties": {}
+    },
+    {
+      "id": "first",
+      "type": "literal.int",
+      "x": -332,
+      "y": 42,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "last",
+      "type": "literal.int",
+      "x": -330,
+      "y": 127,
+      "properties": {
+        "value": "4"
+      }
+    },
+    {
+      "id": "print-line-number",
+      "type": "console.write-line",
+      "x": 557,
+      "y": 287,
+      "properties": {}
+    },
+    {
+      "id": "line-label",
+      "type": "literal.string",
+      "x": 137,
+      "y": 363,
+      "properties": {
+        "value": "Line "
+      }
+    },
+    {
+      "id": "index-text",
+      "type": "convert.int-to-string",
+      "x": 137,
+      "y": 457,
+      "properties": {}
+    },
+    {
+      "id": "line-text",
+      "type": "string.concat",
+      "x": 380,
+      "y": 381,
+      "properties": {}
+    },
+    {
+      "id": "prompt",
+      "type": "console.write-line",
+      "x": 563,
+      "y": 20,
+      "properties": {}
+    },
+    {
+      "id": "prompt-text",
+      "type": "literal.string",
+      "x": 327,
+      "y": 101,
+      "properties": {
+        "value": "Type lines, then an empty line:"
+      }
+    },
+    {
+      "id": "read-loop",
+      "type": "flow.while",
+      "x": 984,
+      "y": 20,
+      "properties": {}
+    },
+    {
+      "id": "forever",
+      "type": "literal.bool",
+      "x": 769,
+      "y": 82,
+      "properties": {
+        "value": "true"
+      }
+    },
+    {
+      "id": "read",
+      "type": "console.read-line",
+      "x": 1665,
+      "y": 21,
+      "properties": {}
+    },
+    {
+      "id": "is-empty",
+      "type": "string.equals",
+      "x": 1938,
+      "y": 101,
+      "properties": {}
+    },
+    {
+      "id": "empty",
+      "type": "literal.string",
+      "x": 1668,
+      "y": 130,
+      "properties": {
+        "value": ""
+      }
+    },
+    {
+      "id": "check",
+      "type": "core.branch",
+      "x": 2221,
+      "y": 17,
+      "properties": {}
+    },
+    {
+      "id": "stop",
+      "type": "flow.break",
+      "x": 2438,
+      "y": -34,
+      "properties": {}
+    },
+    {
+      "id": "count-line",
+      "type": "variable.set",
+      "x": 2768,
+      "y": 40,
+      "properties": {
+        "variable": "lines"
+      }
+    },
+    {
+      "id": "lines-before",
+      "type": "variable.get",
+      "x": 2333,
+      "y": 134,
+      "properties": {
+        "variable": "lines"
+      }
+    },
+    {
+      "id": "one",
+      "type": "literal.int",
+      "x": 2262,
+      "y": 226,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "increment",
+      "type": "math.int.add",
+      "x": 2553,
+      "y": 134,
+      "properties": {}
+    },
+    {
+      "id": "report",
+      "type": "console.write-line",
+      "x": 1662,
+      "y": 317,
+      "properties": {}
+    },
+    {
+      "id": "you-entered",
+      "type": "literal.string",
+      "x": 955,
+      "y": 332,
+      "properties": {
+        "value": "You entered "
+      }
+    },
+    {
+      "id": "lines-after",
+      "type": "variable.get",
+      "x": 955,
+      "y": 412,
+      "properties": {
+        "variable": "lines"
+      }
+    },
+    {
+      "id": "lines-text",
+      "type": "convert.int-to-string",
+      "x": 1195,
+      "y": 412,
+      "properties": {}
+    },
+    {
+      "id": "report-start",
+      "type": "string.concat",
+      "x": 1195,
+      "y": 312,
+      "properties": {}
+    },
+    {
+      "id": "lines-suffix",
+      "type": "literal.string",
+      "x": 1195,
+      "y": 512,
+      "properties": {
+        "value": " lines."
+      }
+    },
+    {
+      "id": "report-text",
+      "type": "string.concat",
+      "x": 1439,
+      "y": 404,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "count-up",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "first",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count-up",
+        "pin": "start"
+      }
+    },
+    {
+      "from": {
+        "node": "last",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count-up",
+        "pin": "end"
+      }
+    },
+    {
+      "from": {
+        "node": "count-up",
+        "pin": "body"
+      },
+      "to": {
+        "node": "print-line-number",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "count-up",
+        "pin": "index"
+      },
+      "to": {
+        "node": "index-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "line-label",
+        "pin": "value"
+      },
+      "to": {
+        "node": "line-text",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "index-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "line-text",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "line-text",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print-line-number",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "count-up",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt-text",
+        "pin": "value"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt",
+        "pin": "then"
+      },
+      "to": {
+        "node": "read-loop",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "forever",
+        "pin": "value"
+      },
+      "to": {
+        "node": "read-loop",
+        "pin": "condition"
+      }
+    },
+    {
+      "from": {
+        "node": "read-loop",
+        "pin": "body"
+      },
+      "to": {
+        "node": "read",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "then"
+      },
+      "to": {
+        "node": "check",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "line"
+      },
+      "to": {
+        "node": "is-empty",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "empty",
+        "pin": "value"
+      },
+      "to": {
+        "node": "is-empty",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "is-empty",
+        "pin": "result"
+      },
+      "to": {
+        "node": "check",
+        "pin": "condition"
+      }
+    },
+    {
+      "from": {
+        "node": "check",
+        "pin": "true"
+      },
+      "to": {
+        "node": "stop",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "check",
+        "pin": "false"
+      },
+      "to": {
+        "node": "count-line",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "lines-before",
+        "pin": "value"
+      },
+      "to": {
+        "node": "increment",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "one",
+        "pin": "value"
+      },
+      "to": {
+        "node": "increment",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "increment",
+        "pin": "result"
+      },
+      "to": {
+        "node": "count-line",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "read-loop",
+        "pin": "completed"
+      },
+      "to": {
+        "node": "report",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "you-entered",
+        "pin": "value"
+      },
+      "to": {
+        "node": "report-start",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "lines-after",
+        "pin": "value"
+      },
+      "to": {
+        "node": "lines-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "lines-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "report-start",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "report-start",
+        "pin": "result"
+      },
+      "to": {
+        "node": "report-text",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "lines-suffix",
+        "pin": "value"
+      },
+      "to": {
+        "node": "report-text",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "report-text",
+        "pin": "result"
+      },
+      "to": {
+        "node": "report",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [
+    {
+      "id": "lines",
+      "name": "lines",
+      "type": "int",
+      "value": "0"
+    }
+  ],
+  "parameters": []
+}

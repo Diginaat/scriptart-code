@@ -1,0 +1,192 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:canvas="using:VisualStudioLikeIDE.App.Canvas"
+        xmlns:edit="using:AvaloniaEdit"
+        x:Class="VisualStudioLikeIDE.App.MainWindow"
+        Title="VisualStudioLikeIDE"
+        Width="1280" Height="800" MinWidth="900" MinHeight="560"
+        WindowStartupLocation="CenterScreen" WindowState="Maximized"
+        Background="{StaticResource IdeWindowBackground}">
+  <Grid>
+    <DockPanel>
+      <Menu x:Name="MainMenu" DockPanel.Dock="Top" Background="{StaticResource IdePanelHeaderBackground}">
+        <MenuItem Header="_File">
+          <MenuItem Header="_New Project…" InputGesture="Ctrl+N" Click="OnNewProject" />
+          <MenuItem Header="_Open Project…" InputGesture="Ctrl+O" Click="OnOpenProject" />
+          <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
+          <Separator />
+          <MenuItem Header="E_xit" Click="OnExit" />
+        </MenuItem>
+        <MenuItem Header="_Edit">
+          <MenuItem x:Name="UndoMenuItem" Header="_Undo" InputGesture="Ctrl+Z" Click="OnUndo" />
+          <MenuItem x:Name="RedoMenuItem" Header="_Redo" InputGesture="Ctrl+Y" Click="OnRedo" />
+          <Separator />
+          <MenuItem x:Name="CutMenuItem" Header="Cu_t" InputGesture="Ctrl+X" Click="OnCut" />
+          <MenuItem x:Name="CopyMenuItem" Header="_Copy" InputGesture="Ctrl+C" Click="OnCopy" />
+          <MenuItem x:Name="PasteMenuItem" Header="_Paste" InputGesture="Ctrl+V" Click="OnPaste" />
+          <MenuItem x:Name="DuplicateMenuItem" Header="D_uplicate" InputGesture="Ctrl+D" Click="OnDuplicate" />
+          <MenuItem x:Name="DeleteMenuItem" Header="_Delete" InputGesture="Delete" Click="OnDelete" />
+          <MenuItem x:Name="SelectAllMenuItem" Header="Select _All" InputGesture="Ctrl+A" Click="OnSelectAll" />
+          <MenuItem x:Name="ConnectMenuItem" Header="Co_nnect Pins…" InputGesture="Ctrl+L" Click="OnConnectPins" />
+          <Separator />
+          <MenuItem x:Name="ArrangeMenuItem" Header="A_rrange">
+            <MenuItem Header="Align _Left" Tag="Left" Click="OnAlign" />
+            <MenuItem Header="Align _Center" Tag="Center" Click="OnAlign" />
+            <MenuItem Header="Align _Right" Tag="Right" Click="OnAlign" />
+            <MenuItem Header="Align _Top" Tag="Top" Click="OnAlign" />
+            <MenuItem Header="Align _Middle" Tag="Middle" Click="OnAlign" />
+            <MenuItem Header="Align _Bottom" Tag="Bottom" Click="OnAlign" />
+            <Separator />
+            <MenuItem Header="Distribute _Horizontally" Tag="Horizontal" Click="OnDistribute" />
+            <MenuItem Header="Distribute _Vertically" Tag="Vertical" Click="OnDistribute" />
+          </MenuItem>
+          <MenuItem x:Name="AddCommentMenuItem" Header="Add Co_mment" InputGesture="C" Click="OnAddComment" />
+        </MenuItem>
+        <MenuItem Header="_View">
+          <MenuItem x:Name="FrameMenuItem" Header="_Frame Graph" InputGesture="Home" Click="OnFrameAll" />
+          <MenuItem x:Name="MinimapMenuItem" Header="_Minimap" ToggleType="CheckBox" IsChecked="True" Click="OnToggleMinimap" />
+          <MenuItem x:Name="FrameStatsMenuItem" Header="Frame _Statistics" ToggleType="CheckBox" Click="OnToggleFrameStats" />
+          <Separator />
+          <MenuItem x:Name="CommandPaletteMenuItem" Header="_Command Palette…" InputGesture="Ctrl+Shift+P" Click="OnShowCommandPalette" />
+        </MenuItem>
+        <MenuItem Header="_Build">
+          <MenuItem x:Name="GenerateMenuItem" Header="_Generate C#" InputGesture="F6" Click="OnGenerate" />
+          <MenuItem x:Name="BuildMenuItem" Header="_Build" InputGesture="Ctrl+Shift+B" Click="OnBuild" />
+          <MenuItem x:Name="RunMenuItem" Header="_Run" InputGesture="F5" Click="OnRun" />
+          <MenuItem x:Name="StopMenuItem" Header="_Stop" InputGesture="Shift+F5" Click="OnStop" />
+        </MenuItem>
+      </Menu>
+
+      <Border DockPanel.Dock="Top" Background="{StaticResource IdePanelHeaderBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,1" Padding="6,3">
+        <StackPanel Orientation="Horizontal">
+          <Button x:Name="SaveButton" Classes="toolbar" Content="Save" ToolTip.Tip="Save project (Ctrl+S)" Click="OnSave" />
+          <Button x:Name="UndoButton" Classes="toolbar" Content="Undo" Click="OnUndo" />
+          <Button x:Name="RedoButton" Classes="toolbar" Content="Redo" Click="OnRedo" />
+          <Rectangle Width="1" Margin="6,4" Fill="{StaticResource IdeBorder}" />
+          <Button x:Name="GenerateButton" Classes="toolbar" Content="Generate C#" ToolTip.Tip="Verify the graph with Roslyn and write Generated/*.g.cs (F6)" Click="OnGenerate" />
+          <Button x:Name="BuildButton" Classes="toolbar" Content="Build" ToolTip.Tip="Save, generate, and run dotnet build (Ctrl+Shift+B)" Click="OnBuild" />
+          <Button x:Name="RunButton" Classes="toolbar" Content="▶ Run" ToolTip.Tip="Build and run the program (F5)" Click="OnRun" />
+          <Button x:Name="StopButton" Classes="toolbar" Content="■ Stop" ToolTip.Tip="Stop the running build or program (Shift+F5)" Click="OnStop" />
+        </StackPanel>
+      </Border>
+
+      <Border DockPanel.Dock="Bottom" Background="{StaticResource IdePanelHeaderBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,3">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <TextBlock x:Name="ProjectText" Grid.Column="0" Classes="secondary" FontSize="12" Text="No project" />
+          <TextBlock x:Name="StatusText" Grid.Column="1" FontSize="12" Margin="16,0" TextTrimming="CharacterEllipsis" />
+          <TextBlock x:Name="ProblemSummary" Grid.Column="2" FontSize="12" />
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="250,4,*,4,300" RowDefinitions="*,4,250">
+        <!-- Node palette -->
+        <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,0,0">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="NODES" />
+            <TextBox x:Name="PaletteSearch" DockPanel.Dock="Top" Margin="8,0,8,6" PlaceholderText="Search nodes" />
+            <TextBlock DockPanel.Dock="Bottom" Classes="secondary" FontSize="11" Margin="10,6" TextWrapping="Wrap"
+                       Text="Drag a node onto the graph, or double-click or press Enter to add it at the center of the view." />
+            <ListBox x:Name="PaletteList" Classes="palette" Background="Transparent" />
+          </DockPanel>
+        </Border>
+        <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+        <!-- Graph canvas -->
+        <Panel Grid.Column="2">
+          <canvas:NodeCanvas x:Name="GraphCanvas" />
+          <!-- Inline value editor, placed over a node's value row. -->
+          <TextBox x:Name="InlineEditor" IsVisible="False" HorizontalAlignment="Left" VerticalAlignment="Top"
+                   MinHeight="0" Padding="6,2" FontSize="13" TextWrapping="Wrap" NewLine="&#10;" />
+          <!-- Quick add: shown where a wire is released on empty space, lists only nodes that can connect to it. -->
+          <Border x:Name="QuickAdd" IsVisible="False" Width="280" MaxHeight="340" HorizontalAlignment="Left" VerticalAlignment="Top"
+                  Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+                  CornerRadius="6" Padding="0,6,0,4" BoxShadow="0 6 18 0 #80000000">
+            <DockPanel>
+              <TextBlock x:Name="QuickAddTitle" DockPanel.Dock="Top" Classes="secondary" FontSize="11" Margin="10,0,10,4" />
+              <TextBox x:Name="QuickAddSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search compatible nodes" />
+              <ListBox x:Name="QuickAddList" Classes="palette" Background="Transparent" />
+            </DockPanel>
+          </Border>
+          <Border x:Name="EmptyState" Background="{StaticResource IdeWindowBackground}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
+              <TextBlock Text="Build C# programs visually" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
+                         Text="Graphs compile to ordinary C# in an SDK-style project that builds and runs with the standard .NET tools, with no dependency on this editor." />
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,8,0,0">
+                <Button Content="New Project…" Click="OnNewProject" Padding="16,8" />
+                <Button Content="Open Project…" Click="OnOpenProject" Padding="16,8" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Panel>
+        <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
+
+        <!-- Inspector -->
+        <Border Grid.Column="4" Classes="panel">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="DETAILS" />
+            <ScrollViewer>
+              <StackPanel x:Name="InspectorPanel" Margin="10,0,10,10" Spacing="6" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" ResizeDirection="Rows" />
+
+        <!-- Bottom panels -->
+        <TabControl x:Name="BottomTabs" Grid.Row="2" Grid.ColumnSpan="5" Classes="bottom" Background="{StaticResource IdePanelBackground}" Padding="0">
+          <TabItem x:Name="ProblemsTab" Header="Problems">
+            <Panel>
+              <ListBox x:Name="ProblemsList" Classes="problems" Background="Transparent" />
+              <TextBlock x:Name="NoProblemsText" Classes="secondary" Margin="12" Text="No problems. The graph compiles to valid C#." />
+            </Panel>
+          </TabItem>
+          <TabItem Header="Generated C#">
+            <DockPanel>
+              <TextBlock x:Name="CodeBanner" DockPanel.Dock="Top" Classes="secondary" FontSize="11" Margin="10,4"
+                         Text="Generated code is read-only. Edit the graph to change it; put handwritten C# in separate .cs files in the project." />
+              <edit:TextEditor x:Name="CodeEditor" IsReadOnly="True" ShowLineNumbers="True" FontSize="13"
+                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
+            </DockPanel>
+          </TabItem>
+          <TabItem x:Name="OutputTab" Header="Output">
+            <DockPanel>
+              <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="6">
+                <TextBox x:Name="InputBox" Grid.Column="0" PlaceholderText="Input for the running program — press Enter to send" />
+                <Button x:Name="SendInputButton" Grid.Column="1" Content="Send" Margin="6,0,0,0" Click="OnSendInput" />
+              </Grid>
+              <edit:TextEditor x:Name="OutputEditor" IsReadOnly="True" FontSize="12"
+                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
+            </DockPanel>
+          </TabItem>
+        </TabControl>
+      </Grid>
+    </DockPanel>
+
+    <!-- Command palette: every enabled menu command and node, filtered as you type. -->
+    <Border x:Name="CommandPalette" IsVisible="False" Width="560" MaxHeight="420" HorizontalAlignment="Center" VerticalAlignment="Top"
+            Margin="0,72,0,0" Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+            CornerRadius="6" Padding="0,8,0,4" BoxShadow="0 8 24 0 #A0000000">
+      <DockPanel>
+        <TextBox x:Name="CommandSearch" DockPanel.Dock="Top" Margin="8,0,8,6" PlaceholderText="Type a command or node name" />
+        <ListBox x:Name="CommandList" Classes="palette" Background="Transparent" />
+      </DockPanel>
+    </Border>
+
+    <!-- Unsaved-changes prompt, shown inline instead of a modal dialog. -->
+    <Border x:Name="ClosePrompt" IsVisible="False" Background="#99000000">
+      <Border Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+              CornerRadius="8" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="440">
+        <StackPanel Spacing="14">
+          <TextBlock Text="Save changes before closing?" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Classes="secondary" TextWrapping="Wrap" Text="The graph has changes that are not saved." />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Save and Close" Click="OnSaveAndClose" />
+            <Button Content="Discard" Click="OnDiscardAndClose" />
+            <Button Content="Cancel" Click="OnCancelClose" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+  </Grid>
+</Window>

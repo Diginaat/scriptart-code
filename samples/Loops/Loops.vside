@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Loops",
+  "rootNamespace": "Loops",
+  "graphs": [
+    "Graphs/Program.graph.json"
+  ]
+}

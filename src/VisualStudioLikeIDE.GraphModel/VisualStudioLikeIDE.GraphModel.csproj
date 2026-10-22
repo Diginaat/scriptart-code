@@ -1,0 +1,3 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Persistent graph documents and their file format. No UI or compiler dependencies. -->
+</Project>

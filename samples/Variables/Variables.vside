@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Variables",
+  "rootNamespace": "Variables",
+  "graphs": [
+    "Graphs/Program.graph.json"
+  ]
+}

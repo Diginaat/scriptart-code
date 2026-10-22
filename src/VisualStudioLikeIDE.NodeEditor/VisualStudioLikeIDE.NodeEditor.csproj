@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Graph editing operations with undo/redo and live connection rules. UI-framework independent, so it is unit-testable. -->
+  <ItemGroup>
+    <ProjectReference Include="..\VisualStudioLikeIDE.Compiler\VisualStudioLikeIDE.Compiler.csproj" />
+  </ItemGroup>
+</Project>
