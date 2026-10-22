@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <!-- Project files, generated-code ownership, and the .NET SDK build and run integration. No UI dependencies. -->
-  <ItemGroup>
-    <ProjectReference Include="..\VisualStudioLikeIDE.Compiler\VisualStudioLikeIDE.Compiler.csproj" />
-  </ItemGroup>
-</Project>

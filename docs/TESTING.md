@@ -1,9 +1,9 @@
 # Testing
 
 ```sh
-dotnet test tests/VisualStudioLikeIDE.Tests              # fast: no processes, ~2 s
-dotnet test tests/VisualStudioLikeIDE.IntegrationTests   # real dotnet build/run, ~10 s
-dotnet run -c Release --project tests/VisualStudioLikeIDE.PerformanceTests
+dotnet test tests/ScriptArt.Tests              # fast: no processes, ~2 s
+dotnet test tests/ScriptArt.IntegrationTests   # real dotnet build/run, ~35 s; set VSIDE_NETCOREDBG to run the debugger test
+dotnet run -c Release --project tests/ScriptArt.PerformanceTests
 ```
 
 ## Suites
@@ -20,6 +20,12 @@ dotnet run -c Release --project tests/VisualStudioLikeIDE.PerformanceTests
 | `MethodTests` | Class and struct methods with Self, calls with a target, functions called from methods through the program class, file names per type, member-name clashes, methods of missing types, Self offered only in methods, saving the owner, adding a method to a project. |
 | `ConstructorAndGenericTests` | Class and struct constructors through Self with a generated parameterless constructor, constructors with the same parameter types reported, generic classes with type arguments on nodes and calls, nested type names, lists of lists, adding a constructor to a project, editing type parameters. |
 | `AsyncAndDotNetMemberTests` | Typed catch and Rethrow, Rethrow outside Catch reported, Throw with a chosen type, .NET constructors, properties, and instance methods of framework value types, generic .NET methods with type arguments, async calls that make their function and its callers async, optional parameters left out. |
+| `TextDiffTests` | Line diff (prefix and suffix trimming, insertions, deletions, replacements), unified diff hunks and context, empty files. |
+| `CodeWorkflowTests` | Generation preview (added, modified, deleted, nothing written, ownership conflicts), adding and saving handwritten files and their protections, verification with unsaved text, Go to Definition in generated and handwritten code, the debugger startup hook. |
+| `DebuggingTests` | DAP message framing, requests, events, and reverse requests over pipes, node breakpoints to lines and back, output assembly path. |
+| `SolutionTests` | Finding a solution, package id and version validation, refused project references, packages and project references read from the `.csproj`. |
+| `NodeNavigationTests` | Go to Definition targets of Call, New, property, Self, and variable nodes, and nodes without one. |
+| `DebuggingAndSolutionTests` (integration) | A real debug session of the Variables sample stopping at a node breakpoint with its locals (skipped without netcoredbg); a solution with a project reference whose methods become nodes. |
 | `EndToEndTests` (integration) | New project builds and prints; the ConsoleApplication sample with and without input; the Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, and Methods samples; calling a method of a `HintPath`-referenced assembly and of a NuGet package (skipped when restore fails without network); handwritten code built with generated code; checked-in sample code matches the generator. |
 
 ## Conventions

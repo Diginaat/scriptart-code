@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Project files, generated-code ownership, and the .NET SDK build, run, and debug integration. No UI dependencies. -->
+  <ItemGroup>
+    <ProjectReference Include="..\ScriptArt.Compiler\ScriptArt.Compiler.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ScriptArt.Tests" />
+  </ItemGroup>
+</Project>

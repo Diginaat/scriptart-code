@@ -48,13 +48,23 @@ Done: constructors, properties, and generic methods of .NET types (D-030). Varia
 
 Done: editor quality of life (D-031). Graphs and variables are renamed in My Project by double-click, F2, or a right-click menu, which also deletes them (with confirmation for graphs) and adds methods and constructors to types; renamed graphs move to their new file name on save. Double-clicking a Call node opens its function, a variable node or Function Entry renames it. Nodes show a hover card with what they do, what they take and give, and what double-clicking does, and the built-in nodes have plain-language descriptions with examples. Text values get a larger multi-line editor with a character count, and fixed choices are picked from a list. Node search understands everyday words (if, print, loop), initials, and typos, and describes the selected node in the action menu.
 
-Next: Phase 4, code quality and IDE integration. Godot 4 C# support is the last phase.
-
 Remaining: overloaded methods and constructors, static members and inheritance of project types, and generic methods of project types.
 
-## Phase 4 — Code quality and IDE integration
+## Phase 4 — Code quality and IDE integration ✅
 
-Multiple graphs per project and a project explorer; editable handwritten files in the code editor; diff preview before regeneration; Go to definition; debugging through the standard .NET debugger with node breakpoints from the source map; solution management.
+Done: multiple graphs per project and a project explorer (My Project, Phase 3), now with **Files** and **References** sections.
+
+Done: editable handwritten files (D-032). My Project → Files lists the project's handwritten `.cs` files; clicking one edits it in the **Code** tab, where it is checked with Roslyn as you type (errors in Problems, which opens the file at the line) and saved with the project (Ctrl+S). Project → Add C# File creates a class file. Generated code stays read-only; **Show Generated Code** returns to it.
+
+Done: diff preview before regeneration (D-033). With Build → Preview Changes Before Generating (on by default), F6 lists the generated files that would be added, changed, or deleted, each as a colored unified diff, and writes nothing until **Write Files**. `vside diff` prints the same diff.
+
+Done: Go to Definition (D-034). F12 on a node opens the function, method, constructor, type, or variable it uses; F12 in code goes to the symbol's declaration: a node of a graph for generated code, the line of a handwritten file, or a message for .NET symbols.
+
+Done: debugging (D-035). F9 sets a breakpoint on a node; F5 builds and runs under netcoredbg, the open-source .NET debugger, over the Debug Adapter Protocol. A stop outlines the node on its graph (or opens the handwritten file at the line) and fills the **Debug** tab with the call stack and expandable locals. Continue (F5), Step Over (F10), Step Into (F11), Step Out (Shift+F11), Pause, and Stop; program input works while debugging. Ctrl+F5 runs without the debugger.
+
+Done: solution management (D-036). Project → Create Solution File (`dotnet new sln`, `.slnx`), Add NuGet Package, Add Project Reference (also added to the solution), and removing either from References, all through the `dotnet` CLI with output in Output. A referenced project's public methods become nodes after a build.
+
+Next: Phase 5. Godot 4 C# support is the last phase.
 
 ## Phase 5 — Extensibility and performance
 

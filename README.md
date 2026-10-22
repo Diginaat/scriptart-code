@@ -1,4 +1,4 @@
-# VisualStudioLikeIDE
+# ScriptArt Code
 
 A visual programming IDE for general-purpose C#/.NET 10 development. You connect nodes to describe program logic; a real compiler turns the graph into ordinary, readable C# inside a standard SDK-style project.
 
@@ -8,7 +8,7 @@ The generated program has no dependency on this IDE: no graph interpreter, no ru
 
 ## Status
 
-Phase 0 (technical design) and Phase 1 (a working end-to-end vertical slice) are complete. See [docs/ROADMAP.md](docs/ROADMAP.md) for what exists and what comes next.
+Phases 0 to 4 are complete: the visual editor, real programming capabilities (variables, loops, functions, collections, classes and structs, async, .NET APIs), and IDE integration (handwritten files, generation preview, Go to Definition, node debugging, solutions). See [docs/ROADMAP.md](docs/ROADMAP.md) for what exists and what comes next.
 
 What works today:
 
@@ -17,7 +17,10 @@ What works today:
 - Live type-checked diagnostics linked to nodes and pins, shown on the canvas and in the Problems panel.
 - Readable C# generated through Roslyn syntax trees, with `if`/`else` structured from the execution graph, a node↔code source map, and Roslyn verification before anything is written.
 - Build and run with the installed .NET SDK from the IDE, with program input and output in the Output panel.
-- A headless CLI (`vside generate|build|run`) for scripts and CI.
+- Handwritten `.cs` files edited in the IDE and checked as you type; a diff preview before generated files are written; Go to Definition (F12).
+- Debugging with breakpoints on nodes (F9, F5, F10, F11) through netcoredbg, with call stack and locals.
+- Solutions, NuGet packages, and project references through the `dotnet` CLI.
+- A headless CLI (`vside generate|diff|build|run`) for scripts and CI.
 
 ## Example
 
@@ -47,11 +50,11 @@ internal static class Program
 Requires the .NET 10 SDK.
 
 ```sh
-dotnet build VisualStudioLikeIDE.slnx
-dotnet run --project src/VisualStudioLikeIDE.App                          # the IDE
-dotnet run --project src/VisualStudioLikeIDE.App -- samples/HelloWorld/HelloWorld.vside
-dotnet run --project src/VisualStudioLikeIDE.Cli -- run samples/ConsoleApplication/ConsoleApplication.vside
-dotnet test VisualStudioLikeIDE.slnx
+dotnet build ScriptArtCode.slnx
+dotnet run --project src/ScriptArt.App                          # the IDE
+dotnet run --project src/ScriptArt.App -- samples/HelloWorld/HelloWorld.vside
+dotnet run --project src/ScriptArt.Cli -- run samples/ConsoleApplication/ConsoleApplication.vside
+dotnet test ScriptArtCode.slnx
 ```
 
 The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
@@ -85,18 +88,23 @@ The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 | Reroute a wire | Double-click a wire to add a point (keep holding to drag it); drag a point to move it; Alt+click it to remove it |
 | Cut, copy, paste, duplicate | Ctrl+X, Ctrl+C, Ctrl+V (at the pointer), Ctrl+D |
 | Delete, undo, redo, save | Delete, Ctrl+Z, Ctrl+Y, Ctrl+S |
-| Generate, build, run, stop | F6, Ctrl+Shift+B, F5, Shift+F5 |
+| Handwritten C# | My Project → Files: click a file to edit it in the Code tab; Project → Add C# File. Saved with Ctrl+S |
+| Go to definition | F12 on a selected node or on a name in the code |
+| Generate (with preview), build | F6, Ctrl+Shift+B. Build → Preview Changes Before Generating turns the diff preview on or off |
+| Debug, run, stop | F5 (debug), Ctrl+F5 (run without debugging), Shift+F5 |
+| Breakpoints and stepping | F9 on a node; while paused F5 continues, F10 steps over, F11 steps into, Shift+F11 steps out. Needs [netcoredbg](https://github.com/Samsung/netcoredbg/releases) on PATH or in `VSIDE_NETCOREDBG` |
+| Packages, references, solution | Project menu, or **+** next to References in My Project |
 
 ## Repository layout
 
 ```
 src/
-  VisualStudioLikeIDE.GraphModel     graph documents and the versioned JSON format
-  VisualStudioLikeIDE.Compiler       validation, IR, control-flow analysis, Roslyn emission, node library
-  VisualStudioLikeIDE.NodeEditor     undoable editing operations (no UI dependency)
-  VisualStudioLikeIDE.ProjectSystem  project files, generated-code ownership, dotnet build/run
-  VisualStudioLikeIDE.App            Avalonia desktop IDE
-  VisualStudioLikeIDE.Cli            headless generate/build/run
+  ScriptArt.GraphModel     graph documents and the versioned JSON format
+  ScriptArt.Compiler       validation, IR, control-flow analysis, Roslyn emission, node library
+  ScriptArt.NodeEditor     undoable editing operations (no UI dependency)
+  ScriptArt.ProjectSystem  project files, generated-code ownership, dotnet build/run
+  ScriptArt.App            Avalonia desktop IDE
+  ScriptArt.Cli            headless generate/build/run
 tests/                               unit, integration (real dotnet builds), performance harness
 samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, Methods
 docs/                                architecture, compiler pipeline, formats, decisions, roadmap

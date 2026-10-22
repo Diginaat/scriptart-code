@@ -31,7 +31,7 @@ Run in execution order. Emit statements with `context.Emit`, expose values with 
 
 A loop node declares its body output with `PinDefinition.LoopBody()` and lowers it with `context.LowerLoopBody`, passing any data outputs that only exist inside the body (create their locals with `context.NewLocal`). Nodes for .NET methods are not written by hand: `ExternalApi` builds them from assembly metadata (`ExternalMethodNode`, `ExternalPureMethodNode`), and `NodeLibrary.CreateDefault(referencePaths)` registers them. For Each nodes (`CollectionNodes`) are loop nodes too. Other nested blocks use `PinDefinition.Block(id, name)` and `context.LowerBlock(id, kind, values)`, as the Try node does.
 
-See `ConsoleReadLineNode`, `BranchNode`, and `ForLoopNode` in `src/VisualStudioLikeIDE.Compiler/Nodes/BuiltInNodes.cs`.
+See `ConsoleReadLineNode`, `BranchNode`, and `ForLoopNode` in `src/ScriptArt.Compiler/Nodes/BuiltInNodes.cs`.
 
 ## Nodes whose pins depend on the graph
 

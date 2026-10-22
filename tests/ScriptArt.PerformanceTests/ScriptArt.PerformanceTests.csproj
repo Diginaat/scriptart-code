@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Coarse, reproducible timings for compiler and serialization on large graphs. Run in Release: dotnet run -c Release. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ScriptArt.Compiler\ScriptArt.Compiler.csproj" />
+  </ItemGroup>
+</Project>

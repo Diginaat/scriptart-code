@@ -2,10 +2,10 @@
 
 ## Method
 
-`tests/VisualStudioLikeIDE.PerformanceTests` builds synthetic graphs where each statement is a Print Line fed by a Concatenate of two literals (4 nodes and 4 connections per statement, plus Entry). Each operation runs once to warm up, then seven times; the median is reported. Allocation is measured on the calling thread for one compile. Release build, no debugger.
+`tests/ScriptArt.PerformanceTests` builds synthetic graphs where each statement is a Print Line fed by a Concatenate of two literals (4 nodes and 4 connections per statement, plus Entry). Each operation runs once to warm up, then seven times; the median is reported. Allocation is measured on the calling thread for one compile. Release build, no debugger.
 
 ```sh
-dotnet run -c Release --project tests/VisualStudioLikeIDE.PerformanceTests
+dotnet run -c Release --project tests/ScriptArt.PerformanceTests
 ```
 
 ## Results (2026-10-22)
@@ -24,7 +24,7 @@ Compilation scales roughly linearly. Roslyn verification is not included (it run
 Measured by hand in the Release build with View → Frame Statistics, which times `NodeCanvas.Render` on the UI thread. That is the cost of building the frame's drawing commands; Avalonia rasterizes them afterwards on its render thread, which this does not include. There are no automated UI benchmarks (see TESTING.md).
 
 ```sh
-dotnet run -c Release --project tests/VisualStudioLikeIDE.PerformanceTests -- --write-graph 2500 <project>/Graphs/Program.graph.json
+dotnet run -c Release --project tests/ScriptArt.PerformanceTests -- --write-graph 2500 <project>/Graphs/Program.graph.json
 ```
 
 Graph of 10,001 nodes and 10,000 wires at 20% zoom with about 200 nodes and 210 wires on screen, measured over a marquee drag (median of the last frames):

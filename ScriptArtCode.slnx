@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ScriptArt.App/ScriptArt.App.csproj" />
+    <Project Path="src/ScriptArt.Cli/ScriptArt.Cli.csproj" />
+    <Project Path="src/ScriptArt.Compiler/ScriptArt.Compiler.csproj" />
+    <Project Path="src/ScriptArt.GraphModel/ScriptArt.GraphModel.csproj" />
+    <Project Path="src/ScriptArt.NodeEditor/ScriptArt.NodeEditor.csproj" />
+    <Project Path="src/ScriptArt.ProjectSystem/ScriptArt.ProjectSystem.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ScriptArt.IntegrationTests/ScriptArt.IntegrationTests.csproj" />
+    <Project Path="tests/ScriptArt.PerformanceTests/ScriptArt.PerformanceTests.csproj" />
+    <Project Path="tests/ScriptArt.Tests/ScriptArt.Tests.csproj" />
+  </Folder>
+</Solution>

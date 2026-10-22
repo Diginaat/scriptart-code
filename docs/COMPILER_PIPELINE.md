@@ -1,6 +1,6 @@
 # Compiler pipeline
 
-Entry point: `GraphCompiler.Compile(graph, options, sourceDescription)` in `src/VisualStudioLikeIDE.Compiler`.
+Entry point: `GraphCompiler.Compile(graph, options, sourceDescription)` in `src/ScriptArt.Compiler`.
 
 ```
 GraphDocument
