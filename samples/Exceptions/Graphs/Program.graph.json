@@ -1,0 +1,286 @@
+{
+  "schemaVersion": 5,
+  "id": "exceptions-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "prompt",
+      "type": "console.write-line",
+      "x": 220,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "prompt-text",
+      "type": "literal.string",
+      "x": 0,
+      "y": 100,
+      "properties": {
+        "value": "Enter a number:"
+      }
+    },
+    {
+      "id": "read",
+      "type": "console.read-line",
+      "x": 460,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "attempt",
+      "type": "flow.try",
+      "x": 680,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "parse",
+      "type": "convert.string-to-int",
+      "x": 680,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "double",
+      "type": "math.int.multiply",
+      "x": 900,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "two",
+      "type": "literal.int",
+      "x": 680,
+      "y": 340,
+      "properties": {
+        "value": "2"
+      }
+    },
+    {
+      "id": "doubled-text",
+      "type": "convert.int-to-string",
+      "x": 1120,
+      "y": 240,
+      "properties": {}
+    },
+    {
+      "id": "print-doubled",
+      "type": "console.write-line",
+      "x": 1340,
+      "y": -120,
+      "properties": {}
+    },
+    {
+      "id": "failure-label",
+      "type": "literal.string",
+      "x": 900,
+      "y": 420,
+      "properties": {
+        "value": "Not a number: "
+      }
+    },
+    {
+      "id": "failure-text",
+      "type": "string.concat",
+      "x": 1120,
+      "y": 420,
+      "properties": {}
+    },
+    {
+      "id": "print-failure",
+      "type": "console.write-line",
+      "x": 1340,
+      "y": 40,
+      "properties": {}
+    },
+    {
+      "id": "print-done",
+      "type": "console.write-line",
+      "x": 1340,
+      "y": 200,
+      "properties": {}
+    },
+    {
+      "id": "done-text",
+      "type": "literal.string",
+      "x": 1120,
+      "y": 560,
+      "properties": {
+        "value": "Done."
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt-text",
+        "pin": "value"
+      },
+      "to": {
+        "node": "prompt",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "prompt",
+        "pin": "then"
+      },
+      "to": {
+        "node": "read",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "then"
+      },
+      "to": {
+        "node": "attempt",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "attempt",
+        "pin": "try"
+      },
+      "to": {
+        "node": "print-doubled",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "read",
+        "pin": "line"
+      },
+      "to": {
+        "node": "parse",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "parse",
+        "pin": "value"
+      },
+      "to": {
+        "node": "double",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "two",
+        "pin": "value"
+      },
+      "to": {
+        "node": "double",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "double",
+        "pin": "result"
+      },
+      "to": {
+        "node": "doubled-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "doubled-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "print-doubled",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "attempt",
+        "pin": "catch"
+      },
+      "to": {
+        "node": "print-failure",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "failure-label",
+        "pin": "value"
+      },
+      "to": {
+        "node": "failure-text",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "attempt",
+        "pin": "message"
+      },
+      "to": {
+        "node": "failure-text",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "failure-text",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print-failure",
+        "pin": "text"
+      }
+    },
+    {
+      "from": {
+        "node": "attempt",
+        "pin": "finally"
+      },
+      "to": {
+        "node": "print-done",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "done-text",
+        "pin": "value"
+      },
+      "to": {
+        "node": "print-done",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [],
+  "parameters": []
+}

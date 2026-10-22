@@ -84,6 +84,12 @@ public sealed class FunctionReturnNode(TypeRef type) : StatementNodeDefinition(
     public override void Lower(StatementLoweringContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (context.IsInFinally)
+        {
+            context.ReportError(Diagnostics.DiagnosticIds.JumpOutOfFinally, "Return Value cannot leave a Finally block. Put it after the Try node.");
+            return;
+        }
+
         context.Emit(new IrReturn(context.Input("value")));
     }
 }

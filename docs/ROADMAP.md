@@ -24,9 +24,11 @@ Done: function graphs (graph schema version 5). File → Add Function, or **+ Fu
 
 Done: shared-subexpression hoisting. A value one statement uses more than once is computed once into a local before it (D-018).
 
+Done: exceptions. The Try node runs its Try block, a Catch block with the error's Message, and a Finally block; Throw Error stops with a message (D-019). See the `Exceptions` sample.
+
 Next: `foreach` over collections, which needs collection types first.
 
-Remaining: `foreach` over collections; classes, structs, properties; collections and generics; exceptions; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
+Remaining: `foreach` over collections; classes, structs, properties; collections and generics; typed catch clauses and rethrow; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures.
 
 ## Phase 4 — Code quality and IDE integration
 

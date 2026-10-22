@@ -209,8 +209,9 @@ public sealed class GraphCompiler(NodeLibrary library)
     /// </summary>
     private static bool AlwaysReturns(IrBlock block) => block.Statements.Exists(statement => statement switch
     {
-        IrReturn => true,
+        IrReturn or IrThrow => true,
         IrIf branch => AlwaysReturns(branch.Then) && AlwaysReturns(branch.Else),
+        IrTry attempt => (AlwaysReturns(attempt.Try) && AlwaysReturns(attempt.Catch)) || AlwaysReturns(attempt.Finally),
         IrWhile { Condition: IrLiteral { Value: true } } loop => !Breaks(loop.Body),
         _ => false,
     });
@@ -220,6 +221,7 @@ public sealed class GraphCompiler(NodeLibrary library)
     {
         IrBreak => true,
         IrIf branch => Breaks(branch.Then) || Breaks(branch.Else),
+        IrTry attempt => Breaks(attempt.Try) || Breaks(attempt.Catch),
         _ => false,
     });
 }

@@ -51,6 +51,9 @@ public sealed record IrCall(string MethodName, IReadOnlyList<IrExpression> Argum
 public sealed record IrInstanceCall(IrExpression Receiver, string MethodName, IReadOnlyList<IrExpression> Arguments, TypeRef Type)
     : IrExpression(Type);
 
+/// <summary>Reads a property or field of a value, for example <c>exception.Message</c>.</summary>
+public sealed record IrMemberAccess(IrExpression Receiver, string MemberName, TypeRef Type) : IrExpression(Type);
+
 public sealed record IrLocalReference(IrLocal Local) : IrExpression(Local.Type);
 
 /// <summary>An implicit, lossless conversion inserted where a pin of one type feeds a pin of another.</summary>

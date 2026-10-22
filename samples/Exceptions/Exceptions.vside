@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Exceptions",
+  "rootNamespace": "Exceptions",
+  "graphs": [
+    "Graphs/Program.graph.json"
+  ]
+}

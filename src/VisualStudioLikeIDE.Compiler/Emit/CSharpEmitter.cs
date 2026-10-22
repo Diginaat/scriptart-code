@@ -76,6 +76,9 @@ internal static class CSharpEmitter
             IrFor loop => EmitFor(loop, usings),
             IrBreak => BreakStatement(),
             IrContinue => ContinueStatement(),
+            IrThrow thrown => ThrowStatement(ObjectCreationExpression(TypeExpression(TypeRef.InvalidOperationException, usings))
+                .WithArgumentList(Arguments([thrown.Message], usings))),
+            IrTry attempt => EmitTry(attempt, usings),
             _ => throw new NotSupportedException($"Unsupported IR statement {statement.GetType().Name}."),
         };
 
@@ -93,6 +96,18 @@ internal static class CSharpEmitter
                 [VariableDeclarator(loop.Index.Name).WithInitializer(EqualsValueClause(EmitExpression(loop.Start, usings)))]))
             .WithCondition(EmitExpression(condition, usings))
             .WithIncrementors([PostfixUnaryExpression(SyntaxKind.PostIncrementExpression, IdentifierName(loop.Index.Name))]);
+    }
+
+    private static TryStatementSyntax EmitTry(IrTry attempt, SortedSet<string> usings)
+    {
+        CatchDeclarationSyntax declaration = CatchDeclaration(TypeExpression(TypeRef.Exception, usings));
+        if (attempt.Exception is { } exception)
+        {
+            declaration = declaration.WithIdentifier(Identifier(exception.Name));
+        }
+
+        TryStatementSyntax syntax = TryStatement(EmitBlock(attempt.Try, usings), [CatchClause(declaration, null, EmitBlock(attempt.Catch, usings))], null);
+        return attempt.Finally.IsEmpty ? syntax : syntax.WithFinally(FinallyClause(EmitBlock(attempt.Finally, usings)));
     }
 
     private static IfStatementSyntax EmitIf(IrIf branch, SortedSet<string> usings)
@@ -126,6 +141,8 @@ internal static class CSharpEmitter
         IrInstanceCall call => InvocationExpression(
             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(call.Receiver, Precedence.Primary, usings), IdentifierName(call.MethodName)),
             Arguments(call.Arguments, usings)),
+        IrMemberAccess access => MemberAccessExpression(
+            SyntaxKind.SimpleMemberAccessExpression, Operand(access.Receiver, Precedence.Primary, usings), IdentifierName(access.MemberName)),
         IrError => throw new InvalidOperationException("IR containing errors must not be emitted."),
         _ => throw new NotSupportedException($"Unsupported IR expression {expression.GetType().Name}."),
     };

@@ -28,7 +28,8 @@ internal sealed class MethodLowerer
     private readonly List<Dictionary<PinRef, IrLocal>> scopes = [];
     private readonly Dictionary<string, IrLocal> variables = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IrLocal> parameters = new(StringComparer.Ordinal);
-    private int loopDepth;
+    // The nested blocks being lowered, innermost last: which jumps are allowed depends on them.
+    private readonly List<NestedBlock> blocks = [];
 
     // The statement being lowered: where shared pure values are declared, and how often each pure node feeds it.
     private (string NodeId, IrBlock Block, Dictionary<string, int> Uses, Dictionary<string, IrLocal> Hoisted)? statement;
@@ -141,7 +142,11 @@ internal sealed class MethodLowerer
         return target is null || target == reconvergence ? new IrBlock() : LowerRegion(target, reconvergence);
     }
 
-    internal bool IsInLoopBody => loopDepth > 0;
+    /// <summary>True when Break and Continue are allowed: inside a loop body that does not enclose the innermost Finally block.</summary>
+    internal bool IsInLoopBody => blocks.LastIndexOf(NestedBlock.LoopBody) > blocks.LastIndexOf(NestedBlock.Finally);
+
+    /// <summary>True inside a Finally block, which control cannot leave with return.</summary>
+    internal bool IsInFinally => blocks.Contains(NestedBlock.Finally);
 
     /// <summary>
     /// Lowers the body of a loop node. <paramref name="loopValues"/> are the node's data outputs that only exist inside the body,
@@ -156,15 +161,28 @@ internal sealed class MethodLowerer
             throw new ArgumentException($"Pin '{executionPinId}' does not start a loop body.", nameof(executionPinId));
         }
 
+        return LowerNestedBlock(node, executionPinId, NestedBlock.LoopBody, loopValues);
+    }
+
+    /// <summary>Lowers the nested block reached through a pin created with <see cref="PinDefinition.Block"/> or <see cref="PinDefinition.LoopBody"/>.</summary>
+    internal IrBlock LowerNestedBlock(ResolvedNode node, string executionPinId, NestedBlock kind, IReadOnlyList<(string PinId, IrLocal Local)> values)
+    {
+        PinDefinition pin = node.Definition.FindPin(executionPinId)
+            ?? throw new ArgumentException($"Node type '{node.Definition.TypeId}' has no pin '{executionPinId}'.", nameof(executionPinId));
+        if (!pin.StartsBlock)
+        {
+            throw new ArgumentException($"Pin '{executionPinId}' does not start a nested block.", nameof(executionPinId));
+        }
+
         if (index.ExecutionTarget(node.Id, executionPinId) is not { } target)
         {
             return new IrBlock();
         }
 
-        scopes.Add(loopValues.ToDictionary(value => new PinRef(node.Id, value.PinId), value => value.Local));
-        loopDepth++;
+        scopes.Add(values.ToDictionary(value => new PinRef(node.Id, value.PinId), value => value.Local));
+        blocks.Add(kind);
         IrBlock body = LowerRegion(target, stop: null);
-        loopDepth--;
+        blocks.RemoveAt(blocks.Count - 1);
         scopes.RemoveAt(scopes.Count - 1);
         return body;
     }
@@ -352,4 +370,13 @@ internal sealed class MethodLowerer
 
     private void Report(string id, string message, string nodeId, PinRef? pin = null) =>
         diagnostics.Add(new(id, DiagnosticSeverity.Error, message, GraphId, nodeId, pin));
+}
+
+/// <summary>The kinds of nested block. They decide where Break, Continue, and Return are allowed.</summary>
+public enum NestedBlock
+{
+    LoopBody,
+    Try,
+    Catch,
+    Finally,
 }

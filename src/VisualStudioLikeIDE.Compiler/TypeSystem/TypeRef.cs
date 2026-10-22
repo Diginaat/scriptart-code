@@ -14,6 +14,8 @@ public sealed record TypeRef(string Namespace, string Name, string? Keyword = nu
     public static readonly TypeRef Double = new("System", "Double", "double");
     public static readonly TypeRef String = new("System", "String", "string");
     public static readonly TypeRef Console = new("System", "Console");
+    public static readonly TypeRef Exception = new("System", "Exception");
+    public static readonly TypeRef InvalidOperationException = new("System", "InvalidOperationException");
 
     /// <summary>The types a graph variable can have, in the order the editor offers them.</summary>
     public static IReadOnlyList<TypeRef> VariableTypes { get; } = [Boolean, Int32, Double, String];

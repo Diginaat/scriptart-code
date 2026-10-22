@@ -108,11 +108,24 @@ public sealed class StatementLoweringContext : ExpressionLoweringContext
     public IrBlock LowerLoopBody(string executionPinId, params IReadOnlyList<(string PinId, IrLocal Local)> loopValues) =>
         Lowerer.LowerLoopBody(Node, executionPinId, loopValues);
 
+    /// <summary>
+    /// Lowers the nested block reached through <paramref name="executionPinId"/>, a pin created with <see cref="PinDefinition.Block"/>.
+    /// Each of <paramref name="values"/> makes a data output of this node available inside the block only.
+    /// </summary>
+    public IrBlock LowerBlock(string executionPinId, NestedBlock kind, params IReadOnlyList<(string PinId, IrLocal Local)> values) =>
+        Lowerer.LowerNestedBlock(Node, executionPinId, kind, values);
+
+    /// <summary>True when a data output of this node is connected.</summary>
+    public bool IsOutputUsed(string pinId) => Lowerer.IsOutputUsed(Node, pinId);
+
     /// <summary>A new local with a unique name, not yet bound to any pin.</summary>
     public IrLocal NewLocal(string nameHint, TypeSystem.TypeRef type) => Lowerer.NewLocal(nameHint, type);
 
     /// <summary>True while lowering the body of a loop, where <c>break</c> and <c>continue</c> are allowed.</summary>
     public bool IsInLoopBody => Lowerer.IsInLoopBody;
+
+    /// <summary>True while lowering a Finally block, which Return cannot leave.</summary>
+    public bool IsInFinally => Lowerer.IsInFinally;
 
     /// <summary>Reports an error on this node. The graph then generates no code.</summary>
     public void ReportError(string diagnosticId, string message) => Lowerer.ReportError(Node, diagnosticId, message);

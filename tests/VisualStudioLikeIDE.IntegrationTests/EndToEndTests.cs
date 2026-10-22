@@ -66,11 +66,23 @@ public sealed class EndToEndTests
     }
 
     [Theory]
+    [InlineData("21", "42\n")]
+    [InlineData("abc", "Not a number: The input string 'abc' was not in a correct format.\n")]
+    public async Task ExceptionsSampleCatchesParseErrorsAndAlwaysFinishes(string input, string result)
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Exceptions", directory.Path);
+
+        Assert.Equal($"Enter a number:\n{result}Done.\n", await GenerateBuildAndRun(project, input));
+    }
+
+    [Theory]
     [InlineData("HelloWorld")]
     [InlineData("ConsoleApplication")]
     [InlineData("Variables")]
     [InlineData("Loops")]
     [InlineData("Functions")]
+    [InlineData("Exceptions")]
     public void CheckedInSampleCodeMatchesGenerator(string sample)
     {
         // The samples directory holds the generated code so samples build without the IDE. It must stay current.

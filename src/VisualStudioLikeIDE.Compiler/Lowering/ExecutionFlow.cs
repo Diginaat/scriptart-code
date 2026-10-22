@@ -10,8 +10,8 @@ namespace VisualStudioLikeIDE.Compiler.Lowering;
 /// The immediate post-dominator of a node is the first node that every path leaving it must pass through.
 /// For a linear node it is simply the next node; for a branch it is where the arms reconverge, which is where
 /// the generated <c>if</c> statement ends. All traversals are iterative so very long chains cannot overflow the stack.
-/// A loop body is not a successor of its loop node: the body is lowered as a nested region, and where its flow ends the
-/// iteration ends. The search still follows body connections, so body nodes are reachable and a wire from the body back
+/// A nested block (a loop body, or a Try node's blocks) is not a successor of its node: it is lowered as a nested region, and
+/// where its flow ends the block ends. The search still follows body connections, so body nodes are reachable and a wire from the body back
 /// to an earlier node is reported as a cycle.
 /// </remarks>
 internal sealed class ExecutionFlow
@@ -59,7 +59,7 @@ internal sealed class ExecutionFlow
             indexById.Add(node.Id, id);
             successors.Add([]);
             exitsMethod.Add(node.Definition.Pins.Any(pin =>
-                pin.IsExecution && pin.Direction == Nodes.PinDirection.Output && !pin.StartsLoopBody && index.ExecutionTarget(node.Id, pin.Id) is null));
+                pin.IsExecution && pin.Direction == Nodes.PinDirection.Output && !pin.StartsBlock && index.ExecutionTarget(node.Id, pin.Id) is null));
             onStack.Add(id);
             stack.Push((id, Successors(node).GetEnumerator()));
             return id;
@@ -71,7 +71,7 @@ internal sealed class ExecutionFlow
             {
                 if (pin.IsExecution && pin.Direction == Nodes.PinDirection.Output && index.ExecutionTarget(node.Id, pin.Id) is { } target)
                 {
-                    yield return (target, pin.StartsLoopBody);
+                    yield return (target, pin.StartsBlock);
                 }
             }
         }

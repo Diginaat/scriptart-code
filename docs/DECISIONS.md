@@ -71,3 +71,7 @@
 ## D-018 Shared pure values are hoisted per statement
 
 **Decision.** When one statement uses a pure node with inputs more than once, the value is computed once into a local declared just before that statement. Values shared between statements, and loop inputs (While condition, For end), stay inline. **Why.** Within one statement nothing runs between the uses, so one evaluation is equivalent and the code reads like hand-written C#. Between statements a Set node may change a variable the value reads, and a loop condition must be evaluated on every iteration; hoisting there would change behavior. Literals and variable reads stay inline because a local would add nothing. Trade-off: a value shared by two statements is still computed twice.
+
+## D-019 Exceptions use one Try node with nested blocks
+
+**Decision.** A Try node has Try, Catch, and Finally outputs that start nested blocks, like a loop body, and a Completed output. Catch handles every `Exception` and offers its Message as a string output. Throw Error throws `InvalidOperationException` with a message. **Why.** Nested blocks map one-to-one onto `try`/`catch`/`finally` and reuse the region lowering that loops already have (`PinDefinition.Block`). Exception types other than `Exception` and `string` messages would need the type system to know exception classes, which waits for external .NET types. Jumps out of Finally are reported as VSG0028 instead of being left to Roslyn (CS0157), so the error points at the node. Trade-off: no typed catch clauses, no rethrow, and no exception filters yet.

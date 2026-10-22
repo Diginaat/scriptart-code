@@ -31,6 +31,15 @@ public sealed record IrBreak : IrStatement;
 
 public sealed record IrContinue : IrStatement;
 
+/// <summary><c>throw new InvalidOperationException(message);</c></summary>
+public sealed record IrThrow(IrExpression Message) : IrStatement;
+
+/// <summary>
+/// <c>try { Try } catch (Exception exception) { Catch } finally { Finally }</c>. <paramref name="Exception"/> is null when the catch
+/// block does not use the exception; the finally clause is omitted when <paramref name="Finally"/> is empty.
+/// </summary>
+public sealed record IrTry(IrBlock Try, IrLocal? Exception, IrBlock Catch, IrBlock Finally) : IrStatement;
+
 /// <summary>An ordered list of statements forming one C# block.</summary>
 public sealed class IrBlock
 {
@@ -39,7 +48,7 @@ public sealed class IrBlock
     public bool IsEmpty => Statements.Count == 0;
 
     /// <summary>True when control never falls through the end of the block.</summary>
-    public bool EndsWithJump => Statements.Count > 0 && Statements[^1] is IrReturn or IrBreak or IrContinue;
+    public bool EndsWithJump => Statements.Count > 0 && Statements[^1] is IrReturn or IrBreak or IrContinue or IrThrow;
 }
 
 public sealed record IrParameter(string Name, TypeRef Type);

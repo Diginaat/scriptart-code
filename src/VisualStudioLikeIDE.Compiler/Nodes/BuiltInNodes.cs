@@ -21,6 +21,8 @@ public static class BuiltInNodes
         yield return new ForLoopNode();
         yield return new LoopJumpNode("flow.break", "Break", "Leaves the innermost loop and continues after it. Generates break.", new IrBreak());
         yield return new LoopJumpNode("flow.continue", "Continue", "Skips the rest of the loop body and starts the next iteration. Generates continue.", new IrContinue());
+        yield return new TryNode();
+        yield return new ThrowNode();
 
         yield return new ConsoleWriteNode("console.write-line", "Print Line", "WriteLine", "Writes text followed by a line break to the console.");
         yield return new ConsoleWriteNode("console.write", "Print", "Write", "Writes text to the console without a line break.");
@@ -130,6 +132,12 @@ public sealed class ReturnNode() : StatementNodeDefinition(
             return;
         }
 
+        if (context.IsInFinally)
+        {
+            context.ReportError(DiagnosticIds.JumpOutOfFinally, "Return cannot leave a Finally block. Put it after the Try node.");
+            return;
+        }
+
         context.Emit(new IrReturn(null));
     }
 }
@@ -193,6 +201,12 @@ public sealed class LoopJumpNode(string typeId, string displayName, string descr
     public override void Lower(StatementLoweringContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (!context.IsInLoopBody && context.IsInFinally)
+        {
+            context.ReportError(DiagnosticIds.JumpOutOfFinally, $"{DisplayName} cannot leave a Finally block. Only a loop inside the Finally block can use it.");
+            return;
+        }
+
         if (!context.IsInLoopBody)
         {
             context.ReportError(DiagnosticIds.JumpOutsideLoop, $"{DisplayName} must be inside the Loop Body of a While Loop or For Loop.");
@@ -346,5 +360,66 @@ public sealed class ParseNode(string typeId, string displayName, TypeRef targetT
     {
         ArgumentNullException.ThrowIfNull(context);
         return new IrStaticCall(targetType, "Parse", [context.Input("text")], targetType);
+    }
+}
+
+/// <summary>
+/// Runs Try; if it throws, runs Catch with the error's message; then always runs Finally. Generates
+/// <c>try { } catch (Exception exception) { } finally { }</c>.
+/// </summary>
+public sealed class TryNode() : StatementNodeDefinition(
+    "flow.try",
+    "Try",
+    "Flow",
+    "Runs Try. If it fails with an exception, runs Catch, where Message describes the error. Finally always runs last, even after Return or Break. Then runs Completed. Generates try, catch, and finally.",
+    [
+        PinDefinition.ExecutionIn(),
+        PinDefinition.Block("try", "Try"),
+        PinDefinition.Block("catch", "Catch"),
+        PinDefinition.DataOut("message", "Message", TypeRef.String),
+        PinDefinition.Block("finally", "Finally"),
+        PinDefinition.ExecutionOut("completed", "Completed"),
+    ])
+{
+    public override void Lower(StatementLoweringContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        IrBlock attempt = context.LowerBlock("try", NestedBlock.Try);
+
+        // The exception gets a name only when the Catch block reads its message.
+        IrLocal? exception = null;
+        IrBlock handler;
+        if (context.IsOutputUsed("message"))
+        {
+            exception = context.NewLocal("exception", TypeRef.Exception);
+            IrLocal message = context.NewLocal("message", TypeRef.String);
+            handler = context.LowerBlock("catch", NestedBlock.Catch, ("message", message));
+            var read = new IrLocalDeclaration(message, new IrMemberAccess(new IrLocalReference(exception), "Message", TypeRef.String));
+            handler.Statements.Insert(0, read with { SourceNodeId = context.NodeId });
+        }
+        else
+        {
+            handler = context.LowerBlock("catch", NestedBlock.Catch);
+        }
+
+        context.Emit(new IrTry(attempt, exception, handler, context.LowerBlock("finally", NestedBlock.Finally)));
+    }
+}
+
+/// <summary>Stops with an error. Generates <c>throw new InvalidOperationException(message);</c>.</summary>
+public sealed class ThrowNode() : StatementNodeDefinition(
+    "flow.throw",
+    "Throw Error",
+    "Flow",
+    "Stops with an error that has the given message. A surrounding Try node's Catch handles it; otherwise the program ends with the error. Generates throw.",
+    [
+        PinDefinition.ExecutionIn(),
+        PinDefinition.DataIn("message", "Message", TypeRef.String),
+    ])
+{
+    public override void Lower(StatementLoweringContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        context.Emit(new IrThrow(context.Input("message")));
     }
 }

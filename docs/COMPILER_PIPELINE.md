@@ -20,7 +20,7 @@ If any stage reports an error, no C# is produced and nothing is written.
 
 **Structural validation (`GraphIndex`).** Resolves each node's definition, rejects duplicate node IDs, unknown types, dangling connections, output-to-output or execution-to-data links, type mismatches, multiple connections on single-connection pins (data inputs, execution outputs), and invalid property text. Invalid elements are reported and left out of the index so later stages never see them.
 
-**Control-flow analysis (`ExecutionFlow`).** Depth-first search from the Entry node over execution connections. A back edge is an error: repetition is expressed with loop nodes, not with wires that point backwards. A loop node's Loop Body output is followed for reachability and cycle detection but is not a successor of the loop node, so the loop node continues at its Completed output and the body forms a separate region whose flow ends where an iteration ends. Immediate post-dominators are computed with the Cooper–Harvey–Kennedy algorithm on the reversed graph; a virtual exit follows every node with an unconnected execution output or none at all. All traversals are iterative.
+**Control-flow analysis (`ExecutionFlow`).** Depth-first search from the Entry node over execution connections. A back edge is an error: repetition is expressed with loop nodes, not with wires that point backwards. An output that starts a nested block (a loop's Loop Body; a Try node's Try, Catch, and Finally) is followed for reachability and cycle detection but is not a successor of its node, so the node continues at its Completed output and each block forms a separate region whose flow ends where the block ends. Immediate post-dominators are computed with the Cooper–Harvey–Kennedy algorithm on the reversed graph; a virtual exit follows every node with an unconnected execution output or none at all. All traversals are iterative.
 
 **Lowering (`MethodLowerer`).** Walks statement nodes in execution order. After each node it continues at the node's immediate post-dominator. For a linear node that is the next node; for a Branch it is the point where both arms rejoin, so arms are lowered as nested blocks that stop there and the shared continuation follows the `if`. Each node definition lowers itself through a context:
 
@@ -28,7 +28,7 @@ If any stage reports an error, no C# is produced and nothing is written.
 - Data inputs from statement nodes (for example Read Line's output) refer to the local the producer declared. Locals are visible in the declaring block and nested blocks only, mirroring C# scoping; using a value on a path where its producer did not run is an error.
 - `Int32 → Double` connections insert an explicit conversion so the node's arithmetic type is preserved.
 - A node reached twice (an arm jumping into the middle of another path) is reported as unstructured flow.
-- A loop node lowers its body with `LowerLoopBody`, inside a scope that also holds values only the body can see, such as the For Loop index (`i`, then `i2` for nested loops). Break and Continue are errors outside a loop body. A body that runs into a node outside the loop is unstructured flow.
+- A loop node lowers its body with `LowerLoopBody`, inside a scope that also holds values only the body can see, such as the For Loop index (`i`, then `i2` for nested loops). Break and Continue are errors outside a loop body. A body that runs into a node outside the loop is unstructured flow. A Try node lowers its blocks with `LowerBlock`; Return, Return Value, Break, and Continue cannot leave a Finally block.
 - Graph variables used by a Get or Set node are declared at the top of the method with their initial value, before any other local is named, so they keep the user's names. Get nodes are pure and read the variable where their value is used; Set nodes emit an assignment. Variables no node uses are not declared.
 
 **Simplification (`IrSimplifier`).** `if (c) {} else {B}` → `if (!c) {B}` (equality operators are inverted directly; relational ones are not, because of NaN); `if (c) {A; return;} else {B}` → `if (c) {A; return;} B`; empty side-effect-free `if`s are dropped; a trailing `return;` in a void method is removed.
@@ -68,6 +68,7 @@ If any stage reports an error, no C# is produced and nothing is written.
 | VSG0025 | Function Entry outside a function, or call node for a function that does not exist |
 | VSG0026 | Function with a return type has a path that does not end at Return Value |
 | VSG0027 | Invalid function signature: name, parameter name, or type |
+| VSG0028 | Return, Return Value, Break, or Continue would leave a Finally block |
 | VSP0001 | Generated file target exists and is handwritten |
 | CSxxxx | Roslyn diagnostic, passed through |
 
