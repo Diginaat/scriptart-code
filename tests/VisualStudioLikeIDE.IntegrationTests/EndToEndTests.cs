@@ -1,5 +1,6 @@
 using System.Text;
 using VisualStudioLikeIDE.Compiler;
+using VisualStudioLikeIDE.Compiler.Emit;
 using VisualStudioLikeIDE.Compiler.Nodes;
 using VisualStudioLikeIDE.ProjectSystem;
 
@@ -55,11 +56,21 @@ public sealed class EndToEndTests
         Assert.Equal($"Line 1\nLine 2\nLine 3\nType lines, then an empty line:\n{report}\n", await GenerateBuildAndRun(project, input));
     }
 
+    [Fact]
+    public async Task FunctionsSampleCallsVoidAndRecursiveFunctions()
+    {
+        using var directory = new TemporaryDirectory();
+        VisualProject project = CopySample("Functions", directory.Path);
+
+        Assert.Equal("Hello, functions!\n1! = 1\n2! = 2\n3! = 6\n4! = 24\n5! = 120\n", await GenerateBuildAndRun(project, input: null));
+    }
+
     [Theory]
     [InlineData("HelloWorld")]
     [InlineData("ConsoleApplication")]
     [InlineData("Variables")]
     [InlineData("Loops")]
+    [InlineData("Functions")]
     public void CheckedInSampleCodeMatchesGenerator(string sample)
     {
         // The samples directory holds the generated code so samples build without the IDE. It must stay current.
@@ -69,8 +80,11 @@ public sealed class EndToEndTests
         ProjectGenerationResult result = project.Generate(Compiler);
 
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        string checkedIn = Path.Combine(RepositorySamples(), sample, "Generated", "Program.g.cs");
-        Assert.Equal(File.ReadAllText(checkedIn).ReplaceLineEndings("\n"), result.Sources.Single().Text);
+        foreach (GeneratedSource source in result.Sources)
+        {
+            string checkedIn = Path.Combine(RepositorySamples(), sample, "Generated", source.RelativePath);
+            Assert.Equal(File.ReadAllText(checkedIn).ReplaceLineEndings("\n"), source.Text);
+        }
     }
 
     [Fact]

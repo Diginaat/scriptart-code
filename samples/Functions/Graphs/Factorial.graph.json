@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 5,
+  "id": "factorial",
+  "name": "Factorial",
+  "kind": "Function",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "function.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "branch",
+      "type": "core.branch",
+      "x": 240,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "at-most-one",
+      "type": "compare.int.less-or-equal",
+      "x": 0,
+      "y": 120,
+      "properties": {}
+    },
+    {
+      "id": "one",
+      "type": "literal.int",
+      "x": 0,
+      "y": 240,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "return-one",
+      "type": "function.return",
+      "x": 520,
+      "y": -80,
+      "properties": {}
+    },
+    {
+      "id": "one-again",
+      "type": "literal.int",
+      "x": 300,
+      "y": -120,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "recurse",
+      "type": "function.call",
+      "x": 520,
+      "y": 60,
+      "properties": {
+        "function": "factorial"
+      }
+    },
+    {
+      "id": "minus",
+      "type": "math.int.subtract",
+      "x": 260,
+      "y": 180,
+      "properties": {}
+    },
+    {
+      "id": "one-less",
+      "type": "literal.int",
+      "x": 0,
+      "y": 320,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "times",
+      "type": "math.int.multiply",
+      "x": 760,
+      "y": 180,
+      "properties": {}
+    },
+    {
+      "id": "return-product",
+      "type": "function.return",
+      "x": 1000,
+      "y": 60,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "branch",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "entry",
+        "pin": "n"
+      },
+      "to": {
+        "node": "at-most-one",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "one",
+        "pin": "value"
+      },
+      "to": {
+        "node": "at-most-one",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "at-most-one",
+        "pin": "result"
+      },
+      "to": {
+        "node": "branch",
+        "pin": "condition"
+      }
+    },
+    {
+      "from": {
+        "node": "branch",
+        "pin": "true"
+      },
+      "to": {
+        "node": "return-one",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "one-again",
+        "pin": "value"
+      },
+      "to": {
+        "node": "return-one",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "branch",
+        "pin": "false"
+      },
+      "to": {
+        "node": "recurse",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "entry",
+        "pin": "n"
+      },
+      "to": {
+        "node": "minus",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "one-less",
+        "pin": "value"
+      },
+      "to": {
+        "node": "minus",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "minus",
+        "pin": "result"
+      },
+      "to": {
+        "node": "recurse",
+        "pin": "n"
+      }
+    },
+    {
+      "from": {
+        "node": "recurse",
+        "pin": "then"
+      },
+      "to": {
+        "node": "return-product",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "entry",
+        "pin": "n"
+      },
+      "to": {
+        "node": "times",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "recurse",
+        "pin": "result"
+      },
+      "to": {
+        "node": "times",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "times",
+        "pin": "result"
+      },
+      "to": {
+        "node": "return-product",
+        "pin": "value"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [],
+  "parameters": [
+    {
+      "id": "n",
+      "name": "n",
+      "type": "int"
+    }
+  ],
+  "returnType": "int"
+}

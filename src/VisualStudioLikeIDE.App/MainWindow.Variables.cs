@@ -11,7 +11,8 @@ namespace VisualStudioLikeIDE.App;
 /// <summary>The Variables section of the Details panel, shown when no single node is selected.</summary>
 public partial class MainWindow
 {
-    // The palette lists Get and Set nodes per variable; it is rebuilt only when the variables themselves change.
+    // The palette lists Get and Set nodes per variable and a call node per function; it is rebuilt only when the open graph,
+    // its variables, or a function signature changes.
     private string paletteVariables = "";
 
     // After adding a variable, its name box takes focus once the panel has been rebuilt.
@@ -21,7 +22,10 @@ public partial class MainWindow
     {
         string signature = workspace is null
             ? ""
-            : string.Join("\n", workspace.Editor.Graph.Variables.Select(variable => $"{variable.Id}:{variable.Name}:{variable.Type}"));
+            : string.Join("\n", [
+                workspace.Editor.Graph.Id,
+                .. workspace.Editor.Graph.Variables.Select(variable => $"{variable.Id}:{variable.Name}:{variable.Type}"),
+                .. workspace.Project.Functions.Select(FunctionSignatureText)]);
         if (signature != paletteVariables)
         {
             paletteVariables = signature;

@@ -43,6 +43,12 @@ public static class GraphSerializer
 
         root["schemaVersion"] = GraphDocument.CurrentSchemaVersion;
 
+        // An absent list means an empty one. Without this, the generated deserializer would set the list to null.
+        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters"])
+        {
+            root[list] ??= new JsonArray();
+        }
+
         GraphDocument? graph;
         try
         {

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 5,
+  "id": "greet",
+  "name": "Greet",
+  "kind": "Function",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "function.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "hello",
+      "type": "literal.string",
+      "x": 0,
+      "y": 120,
+      "properties": {
+        "value": "Hello, "
+      }
+    },
+    {
+      "id": "join",
+      "type": "string.concat",
+      "x": 240,
+      "y": 80,
+      "properties": {}
+    },
+    {
+      "id": "bang",
+      "type": "literal.string",
+      "x": 240,
+      "y": 200,
+      "properties": {
+        "value": "!"
+      }
+    },
+    {
+      "id": "text",
+      "type": "string.concat",
+      "x": 480,
+      "y": 80,
+      "properties": {}
+    },
+    {
+      "id": "print",
+      "type": "console.write-line",
+      "x": 720,
+      "y": 0,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "print",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "hello",
+        "pin": "value"
+      },
+      "to": {
+        "node": "join",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "entry",
+        "pin": "name"
+      },
+      "to": {
+        "node": "join",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "join",
+        "pin": "result"
+      },
+      "to": {
+        "node": "text",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "bang",
+        "pin": "value"
+      },
+      "to": {
+        "node": "text",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "text",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": [],
+  "parameters": [
+    {
+      "id": "name",
+      "name": "name",
+      "type": "string"
+    }
+  ]
+}

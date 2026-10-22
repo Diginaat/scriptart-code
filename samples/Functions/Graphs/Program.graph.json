@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 5,
+  "id": "functions-program",
+  "name": "Program",
+  "kind": "EntryPoint",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "core.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "greet",
+      "type": "function.call",
+      "x": 220,
+      "y": 0,
+      "properties": {
+        "function": "greet"
+      }
+    },
+    {
+      "id": "greet-name",
+      "type": "literal.string",
+      "x": 0,
+      "y": 100,
+      "properties": {
+        "value": "functions"
+      }
+    },
+    {
+      "id": "count",
+      "type": "flow.for",
+      "x": 480,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "first",
+      "type": "literal.int",
+      "x": 260,
+      "y": 120,
+      "properties": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "last",
+      "type": "literal.int",
+      "x": 260,
+      "y": 200,
+      "properties": {
+        "value": "6"
+      }
+    },
+    {
+      "id": "factorial",
+      "type": "function.call",
+      "x": 760,
+      "y": 0,
+      "properties": {
+        "function": "factorial"
+      }
+    },
+    {
+      "id": "print",
+      "type": "console.write-line",
+      "x": 1500,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "index-text",
+      "type": "convert.int-to-string",
+      "x": 760,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "label",
+      "type": "literal.string",
+      "x": 760,
+      "y": 240,
+      "properties": {
+        "value": "! = "
+      }
+    },
+    {
+      "id": "left",
+      "type": "string.concat",
+      "x": 1020,
+      "y": 160,
+      "properties": {}
+    },
+    {
+      "id": "result-text",
+      "type": "convert.int-to-string",
+      "x": 1020,
+      "y": 280,
+      "properties": {}
+    },
+    {
+      "id": "line",
+      "type": "string.concat",
+      "x": 1260,
+      "y": 160,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "greet",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "greet-name",
+        "pin": "value"
+      },
+      "to": {
+        "node": "greet",
+        "pin": "name"
+      }
+    },
+    {
+      "from": {
+        "node": "greet",
+        "pin": "then"
+      },
+      "to": {
+        "node": "count",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "first",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count",
+        "pin": "start"
+      }
+    },
+    {
+      "from": {
+        "node": "last",
+        "pin": "value"
+      },
+      "to": {
+        "node": "count",
+        "pin": "end"
+      }
+    },
+    {
+      "from": {
+        "node": "count",
+        "pin": "body"
+      },
+      "to": {
+        "node": "factorial",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "count",
+        "pin": "index"
+      },
+      "to": {
+        "node": "factorial",
+        "pin": "n"
+      }
+    },
+    {
+      "from": {
+        "node": "factorial",
+        "pin": "then"
+      },
+      "to": {
+        "node": "print",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "count",
+        "pin": "index"
+      },
+      "to": {
+        "node": "index-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "index-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "left",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "label",
+        "pin": "value"
+      },
+      "to": {
+        "node": "left",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "factorial",
+        "pin": "result"
+      },
+      "to": {
+        "node": "result-text",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "left",
+        "pin": "result"
+      },
+      "to": {
+        "node": "line",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "result-text",
+        "pin": "text"
+      },
+      "to": {
+        "node": "line",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "line",
+        "pin": "result"
+      },
+      "to": {
+        "node": "print",
+        "pin": "text"
+      }
+    }
+  ],
+  "comments": [],
+  "variables": []
+}

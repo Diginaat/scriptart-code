@@ -78,6 +78,8 @@ public sealed partial class MainWindow : Window
             }
         };
 
+        GraphList.SelectionChanged += (_, _) => OnGraphListSelectionChanged();
+
         ProblemsList.DoubleTapped += (_, _) => GoToDiagnostic(ProblemsList.SelectedItem as ListBoxItem);
         ProblemsList.KeyDown += (_, e) =>
         {
@@ -242,7 +244,7 @@ public sealed partial class MainWindow : Window
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
-        if (!closeConfirmed && workspace?.Editor.IsDirty == true)
+        if (!closeConfirmed && workspace?.IsDirty == true)
         {
             e.Cancel = true;
             ClosePrompt.IsVisible = true;
@@ -417,16 +419,26 @@ public sealed partial class MainWindow : Window
     {
         if (workspace is not null)
         {
-            workspace.Editor.Changed -= OnGraphChanged;
+            workspace.Changed -= OnGraphChanged;
         }
 
         workspace = Workspace.Open(project);
-        workspace.Editor.Changed += OnGraphChanged;
-        GraphCanvas.Editor = workspace.Editor;
-        RefreshPaletteForVariables();
+        workspace.Changed += OnGraphChanged;
         EmptyState.IsVisible = false;
         OutputEditor.Text = "";
         ProjectText.Text = $"{project.Name}  ·  {project.DirectoryPath}";
+        ShowOpenGraph();
+    }
+
+    /// <summary>Shows the workspace's open graph in the canvas, palette, graph list, and panels.</summary>
+    private void ShowOpenGraph()
+    {
+        HideQuickAdd();
+        EndInlineEdit(commit: true);
+        GraphCanvas.Editor = workspace!.Editor;
+        RefreshGraphList();
+        RefreshPaletteForVariables();
+        ShowInspector();
         ShowCompilation(workspace.LastCompilation);
         UpdateTitle();
         UpdateCommandStates();
@@ -441,6 +453,7 @@ public sealed partial class MainWindow : Window
         UpdateCommandStates();
         ShowInspector();
         RefreshPaletteForVariables();
+        RefreshGraphList();
     }
 
     private void Recompile()
@@ -605,7 +618,7 @@ public sealed partial class MainWindow : Window
     {
         Title = workspace is null
             ? "VisualStudioLikeIDE"
-            : $"{workspace.Project.Name}{(workspace.Editor.IsDirty ? " •" : "")} — VisualStudioLikeIDE";
+            : $"{workspace.Graph.Graph.Name}{(workspace.IsDirty ? " •" : "")} — {workspace.Project.Name} — VisualStudioLikeIDE";
     }
 
     private void UpdateCommandStates()
@@ -613,6 +626,7 @@ public sealed partial class MainWindow : Window
         bool open = workspace is not null;
         bool idle = open && !busy && runningProgram is null;
         SaveButton.IsEnabled = SaveMenuItem.IsEnabled = open;
+        AddFunctionButton.IsEnabled = AddFunctionMenuItem.IsEnabled = open;
         UndoButton.IsEnabled = UndoMenuItem.IsEnabled = open && workspace!.Editor.CanUndo;
         RedoButton.IsEnabled = RedoMenuItem.IsEnabled = open && workspace!.Editor.CanRedo;
         ToolTip.SetTip(UndoButton, workspace?.Editor.UndoDescription is { } undo ? $"Undo {undo} (Ctrl+Z)" : "Undo (Ctrl+Z)");

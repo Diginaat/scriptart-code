@@ -15,6 +15,8 @@
           <MenuItem Header="_Open Project…" InputGesture="Ctrl+O" Click="OnOpenProject" />
           <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
           <Separator />
+          <MenuItem x:Name="AddFunctionMenuItem" Header="Add _Function" Click="OnAddFunction" />
+          <Separator />
           <MenuItem Header="E_xit" Click="OnExit" />
         </MenuItem>
         <MenuItem Header="_Edit">
@@ -82,6 +84,13 @@
         <!-- Node palette -->
         <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,0,0">
           <DockPanel>
+            <!-- Graphs: the entry graph and the function graphs; selecting one opens it. -->
+            <DockPanel DockPanel.Dock="Top">
+              <Button x:Name="AddFunctionButton" DockPanel.Dock="Right" Classes="toolbar" Content="+ Function" Margin="0,4,6,0"
+                      ToolTip.Tip="Add a function graph to the project" Click="OnAddFunction" />
+              <TextBlock Classes="panelTitle" Text="GRAPHS" />
+            </DockPanel>
+            <ListBox x:Name="GraphList" DockPanel.Dock="Top" Classes="palette" Background="Transparent" MaxHeight="180" Margin="0,0,0,6" />
             <TextBlock DockPanel.Dock="Top" Classes="panelTitle" Text="NODES" />
             <TextBox x:Name="PaletteSearch" DockPanel.Dock="Top" Margin="8,0,8,6" PlaceholderText="Search nodes" />
             <TextBlock DockPanel.Dock="Bottom" Classes="secondary" FontSize="11" Margin="10,6" TextWrapping="Wrap"

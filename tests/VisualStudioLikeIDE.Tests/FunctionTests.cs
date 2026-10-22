@@ -269,5 +269,8 @@ public sealed class FunctionTests
         GraphDocument old = GraphSerializer.Deserialize("""{ "schemaVersion": 4, "id": "g", "name": "P", "nodes": [], "connections": [], "comments": [], "variables": [] }""");
         Assert.Empty(old.Parameters);
         Assert.Null(old.ReturnType);
+
+        GraphDocument sparse = GraphSerializer.Deserialize("""{ "schemaVersion": 5, "id": "g", "name": "P" }""");
+        Assert.True(sparse.Nodes is [] && sparse.Connections is [] && sparse.Comments is [] && sparse.Variables is [] && sparse.Parameters is []);
     }
 }

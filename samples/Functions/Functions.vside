@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Functions",
+  "rootNamespace": "Functions",
+  "graphs": [
+    "Graphs/Program.graph.json",
+    "Graphs/Factorial.graph.json",
+    "Graphs/Greet.graph.json"
+  ]
+}

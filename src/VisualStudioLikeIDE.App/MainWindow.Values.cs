@@ -147,6 +147,7 @@ public sealed partial class MainWindow
                 Classes = { "secondary" },
                 Margin = new Avalonia.Thickness(0, 8, 0, 0),
             });
+            AddFunctionEditors();
             AddVariableEditors();
             return;
         }

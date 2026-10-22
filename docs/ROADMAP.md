@@ -20,9 +20,11 @@ Done: local variables (graph schema version 4): declared in the Details panel wi
 
 Done: loops. While Loop and For Loop nodes have a Loop Body output and a Completed output; Break and Continue nodes end an iteration. They generate `while`, `for`, `break`, and `continue`. See the `Loops` sample. `foreach` waits for collection types.
 
-Next: **function graphs** with parameters and return values, and call nodes.
+Done: function graphs (graph schema version 5). File → Add Function, or **+ Function** in the Graphs list, adds a function graph; selecting a graph in the list opens it, and each graph keeps its own undo history. The Details panel edits the function's name, return type, and parameters. Function Entry outputs the parameters, Return Value returns a value, and a Call node per function appears in the palette of every graph, including the function itself for recursion. Each function generates a `private static` method in its own `.g.cs` file. See the `Functions` sample.
 
-Remaining: function graphs with parameters and return values; call nodes between graphs; `foreach` over collections; classes, structs, properties; collections and generics; exceptions; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures; shared-subexpression hoisting.
+Next: `foreach` over collections, which needs collection types first.
+
+Remaining: `foreach` over collections; classes, structs, properties; collections and generics; exceptions; async/await; calling external .NET APIs from referenced assemblies and NuGet packages, with filtering of unsupported signatures; shared-subexpression hoisting.
 
 ## Phase 4 — Code quality and IDE integration
 
@@ -38,7 +40,7 @@ Installer, crash recovery and autosave, accessibility review, preferences, upgra
 
 ## Known limitations of the current build
 
-- One graph per project (the entry point), no user functions. Variables are method-wide and limited to `bool`, `int`, `double`, and `string`.
+- Function graphs cannot be deleted or renamed on disk from the IDE yet; the file keeps its first name. Variables, parameters, and return types are limited to `bool`, `int`, `double`, and `string`. Variables are method-wide.
 - Reroute points stay in place when the nodes they connect, or a comment around them, are moved.
 - Running programs receive input from the Output panel's input box; there is no interactive terminal.
 - The `.csproj` is created once; build settings are edited there directly.

@@ -65,11 +65,14 @@ If any stage reports an error, no C# is produced and nothing is written.
 | VSG0022 | Invalid variable: name, duplicate name, type, or initial value |
 | VSG0023 | Variable is set but never read (warning) |
 | VSG0024 | Break or Continue outside a loop body |
+| VSG0025 | Function Entry outside a function, or call node for a function that does not exist |
+| VSG0026 | Function with a return type has a path that does not end at Return Value |
+| VSG0027 | Invalid function signature: name, parameter name, or type |
 | VSP0001 | Generated file target exists and is handwritten |
 | CSxxxx | Roslyn diagnostic, passed through |
 
 ## Known limitations
 
-- One method per graph (Entry → `Program.Main`). Functions and classes are Phase 3. Variables are method-wide; there are no block-scoped variables yet.
+- One method per graph: the entry graph becomes `Program.Main`, each function graph a `private static` method of the same `partial class Program`, in its own file. Classes are not supported yet. Variables are method-wide; there are no block-scoped variables yet.
 - A pure node used by several inputs is inlined at each use. This is correct for side-effect-free nodes but duplicates work; hoisting shared subexpressions into locals is planned.
 - Constant conditions produce Roslyn warnings (for example CS0162) rather than being folded.
