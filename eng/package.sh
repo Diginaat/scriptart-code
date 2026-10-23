@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Builds the release artifacts of ScriptArt Code into artifacts/:
 #   artifacts/ScriptArtCode-<runtime>/        the IDE, self-contained (no .NET install needed to start it), and a .tar.gz of it
+#   artifacts/installer-<runtime>/            a Velopack installer and update packages, for runtimes of this OS when vpk is installed
 #   artifacts/packages/ScriptArt.Cli.*.nupkg  the vside command as a .NET tool: dotnet tool install -g --add-source artifacts/packages ScriptArt.Cli
 #   artifacts/packages/ScriptArt.NodeSdk.*    the node library SDK (with ScriptArt.GraphModel) for building node libraries
 #
@@ -25,6 +26,17 @@ for runtime in "$@"; do
   dotnet publish src/ScriptArt.App -c Release -r "$runtime" --self-contained true -p:DebugType=none -o "$target"
   tar -czf "$target.tar.gz" -C "$out" "ScriptArtCode-$runtime"
 done
+
+# Velopack packs installers only for the OS it runs on (eng/package.ps1 does Windows).
+if command -v vpk >/dev/null 2>&1; then
+  version="$(dotnet msbuild src/ScriptArt.App -getProperty:Version)"
+  case "$(uname -s)" in Linux) os=linux ;; Darwin) os=osx ;; *) os=none ;; esac
+  for runtime in "$@"; do
+    case "$runtime" in "$os"-*)
+      vpk pack --packId ScriptArt.Code --packVersion "$version" --packTitle "ScriptArt Code" --packAuthors Diginaat         --packDir "$out/ScriptArtCode-$runtime" --mainExe ScriptArtCode --runtime "$runtime" --outputDir "$out/installer-$runtime" ;;
+    esac
+  done
+fi
 
 dotnet pack src/ScriptArt.Cli -c Release -o "$out/packages"
 dotnet pack src/ScriptArt.NodeSdk -c Release -o "$out/packages"

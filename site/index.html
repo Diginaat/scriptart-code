@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScriptArt Code</title>
+<meta name="description" content="A visual programming IDE for .NET 10: connect nodes on a canvas, and a real compiler turns them into clean, readable C# you own.">
+<meta property="og:title" content="ScriptArt Code: draw your program, get real C#">
+<meta property="og:description" content="A visual programming IDE for .NET 10 that compiles node graphs to clean, readable C#.">
+<meta property="og:image" content="images/graph-dark.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23232a36'/%3E%3Crect x='5' y='7' width='10' height='7' rx='2' fill='%233d7bd9'/%3E%3Crect x='17' y='18' width='10' height='7' rx='2' fill='%23a855c9'/%3E%3Cpath d='M15 10.5c6 0 2 11 7 11' stroke='%23e6edf3' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f1218;
+  --bg-raised: #171b23;
+  --bg-card: #1c212b;
+  --border: #2a3140;
+  --text: #e6edf3;
+  --muted: #9aa6b5;
+  --accent: #4c8dff;
+  --accent-strong: #2f74f0;
+  --accent-text: #ffffff;
+  --pink: #e05ad8;
+  --teal: #2fc2a8;
+  --red: #d9534f;
+  --violet: #a066d6;
+  --code-bg: #12161d;
+  --kw: #6aa6ff;
+  --str: #e8b36a;
+  --shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.7);
+  --grid: rgba(255, 255, 255, 0.035);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f6f7fa;
+    --bg-raised: #ffffff;
+    --bg-card: #ffffff;
+    --border: #dde2ea;
+    --text: #141a22;
+    --muted: #556070;
+    --accent: #2563eb;
+    --accent-strong: #1d4fd0;
+    --pink: #b5249f;
+    --teal: #0f8a75;
+    --red: #b8322d;
+    --violet: #7a3fb5;
+    --code-bg: #f0f2f6;
+    --kw: #1d4fd0;
+    --str: #9a5a00;
+    --shadow: 0 24px 60px -24px rgba(20, 30, 50, 0.35);
+    --grid: rgba(20, 30, 50, 0.05);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+img { max-width: 100%; display: block; }
+.wrap { width: min(1160px, 100% - 32px); margin-inline: auto; }
+
+/* Header */
+header.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+header.top .wrap { display: flex; align-items: center; gap: 24px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); font-size: 17px; }
+.brand:hover { text-decoration: none; }
+.brand svg { width: 28px; height: 28px; }
+nav.links { display: flex; gap: 22px; margin-left: auto; font-size: 15px; }
+nav.links a { color: var(--muted); }
+nav.links a:hover { color: var(--text); text-decoration: none; }
+
+/* Hero */
+.hero {
+  position: relative; overflow: hidden;
+  padding: 80px 0 40px;
+  background-image:
+    radial-gradient(900px 400px at 50% -80px, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+.hero .wrap { text-align: center; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-raised); color: var(--muted); font-size: 13px; font-weight: 500;
+}
+.pill b { color: var(--teal); font-weight: 600; }
+h1 {
+  font-size: clamp(38px, 6.4vw, 72px); line-height: 1.04; letter-spacing: -0.035em;
+  margin: 22px auto 18px; font-weight: 800; max-width: 14ch;
+}
+h1 .grad {
+  background: linear-gradient(90deg, var(--accent), var(--pink));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.lede { font-size: clamp(17px, 2.1vw, 20px); color: var(--muted); max-width: 640px; margin: 0 auto 32px; }
+.ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 13px 22px; border-radius: 10px; font-weight: 600; font-size: 15px;
+  border: 1px solid var(--border); background: var(--bg-raised); color: var(--text);
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.btn:hover { text-decoration: none; transform: translateY(-1px); }
+.btn.primary { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--accent-text); }
+.btn.primary:hover { background: var(--accent); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn small { font-weight: 400; opacity: 0.8; }
+.note { color: var(--muted); font-size: 13px; margin-top: 14px; }
+
+.shot {
+  margin: 56px auto 0; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--bg-card);
+}
+.shot .bar { display: flex; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.shot .bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--border); }
+.theme-shot .light { display: none; }
+@media (prefers-color-scheme: light) {
+  .theme-shot .light { display: block; }
+  .theme-shot .dark { display: none; }
+}
+
+/* Pipeline */
+.pipeline { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; padding: 44px 0 10px; }
+.stage {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-raised);
+  font-weight: 600; font-size: 14px;
+}
+.stage code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px; }
+.arrow { color: var(--muted); }
+
+/* Sections */
+section { padding: 84px 0; }
+.eyebrow { color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+h2 { font-size: clamp(28px, 3.6vw, 42px); letter-spacing: -0.025em; line-height: 1.12; margin: 10px 0 14px; }
+.section-lede { color: var(--muted); font-size: 18px; max-width: 640px; margin: 0 0 40px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 26px; }
+.card h3 { margin: 14px 0 8px; font-size: 19px; }
+.card p { margin: 0; color: var(--muted); }
+.dot { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; }
+.dot svg { width: 20px; height: 20px; }
+
+.feature { display: grid; grid-template-columns: 1fr 1.6fr; gap: 48px; align-items: center; margin-top: 72px; }
+.feature.flip { grid-template-columns: 1.6fr 1fr; }
+.feature.flip .text { order: 2; }
+.feature h3 { font-size: 26px; letter-spacing: -0.02em; margin: 0 0 12px; line-height: 1.2; }
+.feature p { color: var(--muted); margin: 0 0 12px; }
+.feature .shot { margin: 0; }
+.feature ul { padding-left: 18px; color: var(--muted); margin: 0; }
+.feature li { margin: 4px 0; }
+
+pre.code {
+  margin: 0; padding: 22px 24px; overflow-x: auto;
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 14px;
+  font: 14px/1.65 "JetBrains Mono", ui-monospace, monospace; color: var(--text);
+}
+.kw { color: var(--kw); }
+.st { color: var(--str); }
+.cm { color: var(--muted); }
+
+.grid-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.item { display: flex; gap: 14px; padding: 18px 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
+.item b { display: block; margin-bottom: 2px; }
+.item span { color: var(--muted); font-size: 15px; }
+.swatch { width: 10px; border-radius: 4px; flex: none; }
+
+/* Download */
+.download { background: var(--bg-raised); border-block: 1px solid var(--border); }
+.platforms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.platform { padding: 28px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg-card); display: flex; flex-direction: column; gap: 12px; }
+.platform h3 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.platform h3 svg { width: 22px; height: 22px; }
+.platform p { margin: 0; color: var(--muted); font-size: 15px; flex: 1; }
+.platform .btn { justify-content: center; }
+.steps { counter-reset: step; list-style: none; padding: 0; margin: 40px 0 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.steps li { counter-increment: step; padding: 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); font-size: 15px; color: var(--muted); }
+.steps li::before {
+  content: counter(step); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--accent-strong); color: var(--accent-text); font-weight: 700; font-size: 13px; margin-bottom: 10px;
+}
+.steps b { color: var(--text); }
+
+footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; justify-content: space-between; }
+footer nav { display: flex; gap: 20px; flex-wrap: wrap; }
+footer a { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .cards, .platforms { grid-template-columns: 1fr; }
+  .feature, .feature.flip { grid-template-columns: 1fr; gap: 24px; margin-top: 56px; }
+  .feature.flip .text { order: 0; }
+  .grid-list { grid-template-columns: 1fr; }
+  .steps { grid-template-columns: 1fr 1fr; }
+  nav.links a.hide-sm { display: none; }
+  section { padding: 64px 0; }
+}
+@media (max-width: 520px) {
+  .steps { grid-template-columns: 1fr; }
+  nav.links { gap: 14px; font-size: 14px; }
+  .hero { padding-top: 56px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#232a36"/><rect x="5" y="7" width="10" height="7" rx="2" fill="#3d7bd9"/><rect x="17" y="18" width="10" height="7" rx="2" fill="#a855c9"/><path d="M15 10.5c6 0 2 11 7 11" stroke="#e6edf3" stroke-width="2" fill="none"/></svg>
+      ScriptArt Code
+    </a>
+    <nav class="links">
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="#tour" class="hide-sm">Tour</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/Diginaat/scriptart-code">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <span class="pill"><b>New</b> v0.2.0 alpha: Windows installer, Explorer and file tabs, Godot 4</span>
+    <h1>Draw your program. <span class="grad">Get real C#.</span></h1>
+    <p class="lede">A visual programming IDE for .NET 10. Connect nodes on a canvas, and a real compiler turns them into clean, readable C# that you own.</p>
+    <div class="ctas">
+      <a class="btn primary" href="https://github.com/Diginaat/scriptart-code/releases/latest/download/ScriptArt.Code-win-Setup.exe">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>
+        Download for Windows <small>Setup.exe</small>
+      </a>
+      <a class="btn" href="#download">Linux and macOS</a>
+      <a class="btn" href="https://github.com/Diginaat/scriptart-code">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
+        Source on GitHub
+      </a>
+    </div>
+    <p class="note">Free and open source (MIT). Per-user install, no admin rights needed.</p>
+
+    <div class="shot theme-shot">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <img class="dark" src="images/graph-dark.png" width="1600" height="936" alt="ScriptArt Code with a graph that reads a name, checks it with a Branch node, and prints a greeting">
+      <img class="light" src="images/graph-light.png" width="1600" height="936" alt="The same graph in the light theme" loading="lazy">
+    </div>
+
+    <div class="pipeline" aria-label="How it works">
+      <span class="stage">Visual graph</span><span class="arrow">→</span>
+      <span class="stage">Compiler</span><span class="arrow">→</span>
+      <span class="stage">Clean C#</span><span class="arrow">→</span>
+      <span class="stage"><code>dotnet build</code></span><span class="arrow">→</span>
+      <span class="stage">Your standalone app</span>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <div class="eyebrow">Why ScriptArt Code</div>
+    <h2>Visual when you think, real code when you ship.</h2>
+    <p class="section-lede">No interpreter and no runtime library. Your graphs become ordinary C# that any .NET developer can read, review, and build.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="dot" style="background: color-mix(in srgb, var(--pink) 18%, transparent); color: var(--pink)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="7" r="2.5"/><circle cx="19" cy="17" r="2.5"/><path d="M7.5 7c6 0 3 10 9 10"/></svg></div>
+        <h3>See your logic</h3>
+        <p>Every step of your program is a node, every value a colored wire. Types have colors, so a string never plugs into a number by mistake.</p>
+      </div>
+      <div class="card">
+        <div class="dot" style="background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg></div>
+        <h3>Real code, not a toy</h3>
+        <p>Graphs compile to C# with <code>if</code>, loops, classes, generics, and <code>async</code>. Open the result in any .NET editor.</p>
+      </div>
+      <div class="card">
+        <div class="dot" style="background: color-mix(in srgb, var(--teal) 18%, transparent); color: var(--teal)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3>Safe to explore</h3>
+        <p>Live checks flag mistakes on the node itself, undo is unlimited, autosave keeps recovery copies, and nothing is written until you have seen the diff.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tour" style="padding-top: 0">
+  <div class="wrap">
+    <div class="eyebrow">A tour</div>
+    <h2>Everything a real program needs.</h2>
+
+    <div class="feature">
+      <div class="text">
+        <h3>Loops, variables, and branches</h3>
+        <p>Build with For and While loops, Branch, Break and Continue. Release a wire on empty space to pick from only the nodes that fit.</p>
+        <p>The minimap keeps big graphs easy to move around.</p>
+      </div>
+      <div class="shot"><img src="images/loops-dark.png" width="1600" height="936" alt="The Loops sample: a While Loop that reads lines and counts them" loading="lazy"></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text">
+        <h3>Classes, structs, and methods</h3>
+        <p>Add your own types in <b>My Project</b>, give them properties, methods, and constructors, and use them as nodes.</p>
+        <p>Comments group related nodes and explain what they do.</p>
+      </div>
+      <div class="shot"><img src="images/types-dark.png" width="1600" height="936" alt="The Types sample: an Account class and a Point struct used from a graph, grouped in comments" loading="lazy"></div>
+    </div>
+
+    <div class="feature">
+      <div class="text">
+        <h3>The C# it writes</h3>
+        <p>The <b>Code</b> tab shows the generated C# as you edit, mapped back to the nodes it came from. It is the same code that ships.</p>
+      </div>
+      <div class="shot"><img src="images/code-dark.png" width="1600" height="936" alt="The Code tab under the graph, showing the generated C#" loading="lazy"></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text">
+        <h3>Readable enough to hand to a teammate</h3>
+        <p>The graph at the top of this page becomes exactly this. No generated noise, no helper library.</p>
+      </div>
+<pre class="code"><span class="kw">internal static class</span> Program
+{
+    <span class="kw">public static void</span> Main()
+    {
+        Console.WriteLine(<span class="st">"What is your name?"</span>);
+        <span class="kw">string</span> line = Console.ReadLine() ?? <span class="st">""</span>;
+        <span class="kw">if</span> (line == <span class="st">""</span>)
+        {
+            Console.WriteLine(<span class="st">"You did not enter a name."</span>);
+            <span class="kw">return</span>;
+        }
+
+        Console.WriteLine(<span class="st">"Hello, "</span> + line + <span class="st">"!"</span>);
+        Console.WriteLine(<span class="st">"Goodbye."</span>);
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top: 0">
+  <div class="wrap">
+    <div class="eyebrow">What you can build</div>
+    <h2>From a first program to a Godot game.</h2>
+    <p class="section-lede">The building blocks of C#, the whole .NET library, and an IDE around them.</p>
+    <div class="grid-list">
+      <div class="item"><span class="swatch" style="background: var(--accent)"></span><div><b>Building blocks</b><span>Variables, lists and dictionaries, loops, functions, try/catch, classes, structs, generics, async/await.</span></div></div>
+      <div class="item"><span class="swatch" style="background: var(--teal)"></span><div><b>The whole .NET world</b><span>Call methods of .NET types, NuGet packages, and referenced projects as nodes.</span></div></div>
+      <div class="item"><span class="swatch" style="background: var(--pink)"></span><div><b>Code where you want it</b><span>Handwritten .cs files in tabs beside your graphs, checked as you type.</span></div></div>
+      <div class="item"><span class="swatch" style="background: var(--red)"></span><div><b>Debugging on the canvas</b><span>Breakpoints on nodes (F9), step through (F10, F11), see the call stack and variables.</span></div></div>
+      <div class="item"><span class="swatch" style="background: var(--violet)"></span><div><b>Godot 4</b><span>Godot C# scripts as graphs: override _Ready or _PhysicsProcess, export properties, handle and emit signals.</span></div></div>
+      <div class="item"><span class="swatch" style="background: var(--str)"></span><div><b>Scriptable and extensible</b><span>A <code>vside</code> CLI for generate, diff, build, run, and migrate; node libraries loaded only after you approve them.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="download">
+  <div class="wrap">
+    <div class="eyebrow">Download</div>
+    <h2>Get ScriptArt Code.</h2>
+    <p class="section-lede">The IDE starts without a .NET install. To build and run your programs, install the <a href="https://dotnet.microsoft.com/download">.NET 10 SDK</a>.</p>
+    <div class="platforms">
+      <div class="platform">
+        <h3><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg>Windows</h3>
+        <p>Installer for x64. Installs for your user, no admin rights, with a Start-menu entry. A portable zip is on the release page.</p>
+        <a class="btn primary" href="https://github.com/Diginaat/scriptart-code/releases/latest/download/ScriptArt.Code-win-Setup.exe">Download Setup.exe</a>
+      </div>
+      <div class="platform">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3c-2.2 0-3 2-3 4.5 0 1.5-.8 2.8-1.8 4.2C5.8 13.6 5 15.5 5 17c0 2.5 3 4 7 4s7-1.5 7-4c0-1.5-.8-3.4-2.2-5.3-1-1.4-1.8-2.7-1.8-4.2C15 5 14.2 3 12 3z"/><circle cx="10.5" cy="8" r=".6" fill="currentColor"/><circle cx="13.5" cy="8" r=".6" fill="currentColor"/></svg>Linux</h3>
+        <p>Self-contained build for x64. Unpack it and start <code>ScriptArtCode</code>.</p>
+        <a class="btn" href="https://github.com/Diginaat/scriptart-code/releases/latest/download/ScriptArtCode-linux-x64.zip">Download .zip</a>
+      </div>
+      <div class="platform">
+        <h3><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.1-1.2 2.9-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.4-.9-2.4-4zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>macOS</h3>
+        <p>Self-contained build for Apple silicon. Unpack it and start <code>ScriptArtCode</code>.</p>
+        <a class="btn" href="https://github.com/Diginaat/scriptart-code/releases/latest/download/ScriptArtCode-osx-arm64.zip">Download .zip</a>
+      </div>
+    </div>
+    <p class="note" style="text-align: left">Builds are not code-signed yet, so Windows SmartScreen ("More info" → "Run anyway") and macOS Gatekeeper may ask for confirmation the first time. All files: <a href="https://github.com/Diginaat/scriptart-code/releases">releases</a>.</p>
+
+    <h3 style="margin: 56px 0 0; font-size: 22px">Your first program in a minute</h3>
+    <ol class="steps">
+      <li><b>File → New Project</b>, pick a folder.</li>
+      <li><b>Right-click</b> the canvas, type <code>print</code>, add <b>Print Line</b>.</li>
+      <li>Drag from <b>Entry</b>'s white arrow to Print Line.</li>
+      <li>Drag the pink <b>Text</b> pin to empty space, pick <b>String</b>, type <code>Hello!</code>.</li>
+      <li>Press <b>Ctrl+F5</b>. The output appears in the <b>Output</b> tab.</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>ScriptArt Code · MIT license · © 2026 Diginaat</span>
+    <nav>
+      <a href="https://github.com/Diginaat/scriptart-code">GitHub</a>
+      <a href="https://github.com/Diginaat/scriptart-code/releases">Releases</a>
+      <a href="https://github.com/Diginaat/scriptart-code/blob/main/docs/ROADMAP.md">Roadmap</a>
+      <a href="https://github.com/Diginaat/scriptart-code/blob/main/docs/NODE_AUTHORING.md">Write a node library</a>
+      <a href="https://github.com/Diginaat/scriptart-code/issues">Issues</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

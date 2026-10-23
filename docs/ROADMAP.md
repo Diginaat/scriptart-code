@@ -86,7 +86,7 @@ Next: Phase 6, then Phase 7 (Godot 4 C# support).
 
 ## Phase 6 — Production readiness
 
-Goal: a release that people other than the developers can install, trust with their work, and upgrade. Released so far: `alpha-v0.1.0` (tag only; artifacts built by `eng/package.sh`).
+Goal: a release that people other than the developers can install, trust with their work, and upgrade. Released so far: `alpha-v0.1.0` (tag only; artifacts built by `eng/package.sh`), `v0.2.0-alpha` (Windows installer, packages for Windows, Linux, and macOS).
 
 Starting point (2026-10-23): no installer, no unhandled-exception handling (`Program.Main` starts Avalonia directly), no autosave, no preferences store (only `node-libraries.json` in `%AppData%/ScriptArtCode`), no automation peers for the canvas, no license file.
 
@@ -108,6 +108,8 @@ Done: item 1, preferences (D-044). `preferences.json` is versioned, migrated, an
 Done: item 3, autosave and recovery (D-045). Recovery copies of unsaved work go to the local application data folder at the interval from preferences, never over the project's files; reopening after a crash offers them in the diff view to restore or discard. A headless UI test ends a session without saving and recovers its work.
 
 Done in item 4: contrast and themes (D-046). Dark, light, and system themes; every text and icon color pair is checked against WCAG AA in tests, which found and fixed two failures in the dark theme. See ACCESSIBILITY.md. Remaining in item 4: keyboard audit, visible focus, and the canvas automation peer.
+
+Started in item 5: the Windows installer (D-055). `eng/package.ps1` builds a per-user `Setup.exe` (no admin rights, Start-menu shortcut) and the update packages with Velopack; released as `v0.2.0-alpha`. Remaining in item 5: the update check, the `.vside` file association, Linux and macOS installers, signing.
 
 Done alongside: graph first (D-054). My Project is the default left tab; Files keeps the folder tree for reference, offers graphs before files, and refuses `.vside` and `.graph.json` as plain files; the stepping buttons show only while debugging.
 

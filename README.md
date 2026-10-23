@@ -6,6 +6,8 @@
 
 A visual programming IDE for .NET 10: connect nodes on a canvas, and a real compiler turns them into clean, readable C# you own.
 
+**[Website](https://diginaat.github.io/scriptart-code/)** · **[Download](https://github.com/Diginaat/scriptart-code/releases/latest)**
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4.svg)](https://dotnet.microsoft.com/)
 [![Release](https://img.shields.io/github/v/release/Diginaat/scriptart-code?include_prereleases&label=release)](https://github.com/Diginaat/scriptart-code/releases)
@@ -103,7 +105,7 @@ internal static class Program
 
 ### Download
 
-Grab the latest build for Windows, Linux, or macOS from **[Releases](https://github.com/Diginaat/scriptart-code/releases)**, unpack it, and start `ScriptArtCode`. No .NET install is needed to start the IDE; to build and run your programs, install the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+On Windows, run `ScriptArt.Code-win-Setup.exe` from the latest **[release](https://github.com/Diginaat/scriptart-code/releases)**: it installs for your user without admin rights and adds a Start-menu entry. On Linux and macOS, unpack the zip for your platform and start `ScriptArtCode`. No .NET install is needed to start the IDE; to build and run your programs, install the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 > The builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper may ask for confirmation the first time.
 
@@ -136,7 +138,7 @@ eng/package.sh win-x64 linux-x64 osx-arm64      # or: pwsh eng/package.ps1 -Runt
 dotnet tool install -g --add-source artifacts/packages ScriptArt.Cli
 ```
 
-This produces the self-contained IDE per runtime, the `vside` CLI as a .NET tool, and the node SDK packages in `artifacts/`.
+This produces the self-contained IDE per runtime, the `vside` CLI as a .NET tool, and the node SDK packages in `artifacts/`. With Velopack's tool installed (`dotnet tool install -g vpk`), it also builds the installer and update packages in `artifacts/installer-<runtime>/`.
 
 </details>
 

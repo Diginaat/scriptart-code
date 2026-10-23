@@ -1,0 +1,4 @@
+# Tests compare generated code with raw string literals, so source files keep LF line endings on every platform.
+* text=auto eol=lf
+*.png binary
+*.ico binary
