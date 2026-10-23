@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The node authoring surface: types, IR, pins, node definitions, lowering contexts, and the plug-in entry point.
+    Node libraries reference only this assembly and the graph model, never the compiler or Roslyn. No UI dependencies.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>ScriptArt.NodeSdk</PackageId>
+    <Description>Build node libraries for ScriptArt Code: node definitions that lower to the compiler's intermediate representation.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ScriptArt.GraphModel\ScriptArt.GraphModel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ScriptArt.Compiler" />
+    <InternalsVisibleTo Include="ScriptArt.Tests" />
+  </ItemGroup>
+</Project>

@@ -90,6 +90,33 @@ public sealed class GraphDocument
 
     public GraphComment? FindComment(string commentId) => Comments.Find(comment => comment.Id == commentId);
 
+    /// <summary>
+    /// A deep copy that shares nothing mutable with this graph, so it can be read on another thread while this one is edited.
+    /// </summary>
+    public GraphDocument Clone() => new()
+    {
+        SchemaVersion = SchemaVersion,
+        Id = Id,
+        Name = Name,
+        Kind = Kind,
+        ReturnType = ReturnType,
+        Owner = Owner,
+        Nodes = [.. Nodes.Select(node => new GraphNode
+        {
+            Id = node.Id,
+            Type = node.Type,
+            X = node.X,
+            Y = node.Y,
+            Properties = new SortedDictionary<string, string>(node.Properties, StringComparer.Ordinal),
+        })],
+        Connections = [.. Connections.Select(connection => connection with { Points = connection.Points is null ? null : [.. connection.Points] })],
+        Comments = [.. Comments.Select(comment => new GraphComment { Id = comment.Id, X = comment.X, Y = comment.Y, Width = comment.Width, Height = comment.Height, Text = comment.Text })],
+        Variables = [.. Variables.Select(variable => new GraphVariable { Id = variable.Id, Name = variable.Name, Type = variable.Type, Value = variable.Value })],
+        Parameters = [.. Parameters.Select(parameter => new GraphParameter { Id = parameter.Id, Name = parameter.Name, Type = parameter.Type })],
+        Properties = [.. Properties.Select(property => new GraphProperty { Id = property.Id, Name = property.Name, Type = property.Type, Value = property.Value })],
+        TypeParameters = [.. TypeParameters],
+    };
+
     public static GraphDocument CreateEmpty(string name, GraphKind kind) => new()
     {
         Id = NewId(),

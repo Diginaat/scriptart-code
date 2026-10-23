@@ -4,12 +4,30 @@ using System.Text.Json.Serialization;
 
 namespace ScriptArt.GraphModel;
 
+/// <summary>One step of a file format migration: what it changes, and how, to reach <see cref="ToVersion"/>.</summary>
+public sealed record SchemaMigration(int ToVersion, string Description, Action<JsonObject> Apply);
+
 /// <summary>
 /// Reads and writes graph documents in the versioned JSON format described in docs/GRAPH_FORMAT.md.
 /// </summary>
 public static class GraphSerializer
 {
     public const string FileExtension = ".graph.json";
+
+    /// <summary>
+    /// The steps that bring a graph file from one schema version to the next, in order; step <c>n</c> converts version
+    /// <c>n - 1</c> to <c>n</c>. Each changes the JSON object in place. Every version after 1 has exactly one step.
+    /// </summary>
+    public static IReadOnlyList<SchemaMigration> Migrations { get; } =
+    [
+        new(2, "adds comments", root => root["comments"] = new JsonArray()),
+        new(3, "allows reroute points on wires; nothing to convert", _ => { }),
+        new(4, "adds local variables", root => root["variables"] = new JsonArray()),
+        new(5, "adds function parameters and return types", root => root["parameters"] = new JsonArray()),
+        new(6, "adds classes and structs with properties", root => root["properties"] = new JsonArray()),
+        new(7, "allows methods owned by a class or struct; existing functions stay in the program class", _ => { }),
+        new(8, "adds constructors and type parameters", root => root["typeParameters"] = new JsonArray()),
+    ];
 
     public static string Serialize(GraphDocument graph)
     {
@@ -23,37 +41,9 @@ public static class GraphSerializer
         int version = ReadSchemaVersion(root, GraphDocument.CurrentSchemaVersion, "graph");
 
         // Migration steps transform the JSON object one version at a time, up to CurrentSchemaVersion.
-        if (version < 2)
+        foreach (SchemaMigration migration in Migrations.Where(migration => migration.ToVersion > version))
         {
-            // Version 2 added comments; older files simply have none.
-            root["comments"] = new JsonArray();
-        }
-
-        // Version 3 added optional reroute points on connections; older files have none, so there is nothing to convert.
-
-        if (version < 4)
-        {
-            root["variables"] = new JsonArray();
-        }
-
-        if (version < 5)
-        {
-            root["parameters"] = new JsonArray();
-        }
-
-        if (version < 6)
-        {
-            // Version 6 added classes and structs, whose properties older files cannot have.
-            root["properties"] = new JsonArray();
-        }
-
-        // Version 7 added an optional owner to function graphs; older functions belong to the program class, which an absent
-        // owner means, so there is nothing to convert.
-
-        if (version < 8)
-        {
-            // Version 8 added constructor graphs, which are new files, and type parameters, which older types do not have.
-            root["typeParameters"] = new JsonArray();
+            migration.Apply(root);
         }
 
         root["schemaVersion"] = GraphDocument.CurrentSchemaVersion;

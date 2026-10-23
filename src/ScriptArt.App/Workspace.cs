@@ -29,6 +29,14 @@ internal sealed class Workspace
     // Referenced assemblies whose methods are in the node library.
     private readonly HashSet<string> loadedReferences = new(StringComparer.OrdinalIgnoreCase);
 
+    // How often each graph has changed through its editor, and the copy made for background work at that version. Graphs change
+    // only through their editors, so an unchanged version means the copy is still current and is reused (D-041).
+    private readonly Dictionary<GraphDocument, int> versions = [];
+    private readonly Dictionary<GraphDocument, (int Version, GraphDocument Copy)> copies = [];
+
+    // Identifies the latest compilation of the open graph; a background compilation that finishes after a newer one started is dropped.
+    private int compileRequest;
+
     private Workspace(VisualProject project, GraphCompiler compiler)
     {
         Project = project;
@@ -116,13 +124,17 @@ internal sealed class Workspace
     /// <summary>True when the open handwritten file <paramref name="path"/> has changes that are not saved.</summary>
     public bool IsCodeFileDirty(string path) => codeFiles.TryGetValue(Path.GetFullPath(path), out (TextDocument Document, string SavedText) file) && file.Document.Text != file.SavedText;
 
+    /// <summary>Node libraries' nodes that could not be added, such as nodes whose type ID another library already uses.</summary>
+    public IReadOnlyList<string> LibraryProblems { get; private init; } = [];
+
     /// <summary>The latest in-memory compilation of the open graph. Updated by <see cref="Compile"/>.</summary>
     public GraphCompilationResult LastCompilation { get; private set; }
 
     /// <summary>Raised when any graph's editor changes, including graphs that are not open.</summary>
     public event EventHandler? Changed;
 
-    public static Workspace Open(VisualProject project)
+    /// <summary>Opens <paramref name="project"/> with the built-in nodes, its references' methods, and the nodes of <paramref name="nodeLibraries"/>.</summary>
+    public static Workspace Open(VisualProject project, IReadOnlyList<NodeLibraryContents>? nodeLibraries = null)
     {
         ArgumentNullException.ThrowIfNull(project);
         if (project.Graphs.Count == 0)
@@ -131,7 +143,14 @@ internal sealed class Workspace
         }
 
         IReadOnlyList<string> references = project.References.AssemblyPaths;
-        var workspace = new Workspace(project, new GraphCompiler(NodeLibrary.CreateDefault(references)));
+        NodeLibrary library = NodeLibrary.CreateDefault(references);
+        List<string> problems = [];
+        foreach (NodeLibraryContents contents in nodeLibraries ?? [])
+        {
+            problems.AddRange(library.RegisterLibrary(contents));
+        }
+
+        var workspace = new Workspace(project, new GraphCompiler(library)) { LibraryProblems = problems };
         workspace.loadedReferences.UnionWith(references);
         return workspace;
     }
@@ -200,6 +219,8 @@ internal sealed class Workspace
         foreach (ProjectGraph item in removed)
         {
             editors.Remove(item.Graph);
+            versions.Remove(item.Graph);
+            copies.Remove(item.Graph);
         }
 
         projectChanged = true;
@@ -235,12 +256,50 @@ internal sealed class Workspace
                 string.Equals(graph.Graph.Name, candidate, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(graph.RelativePath)), candidate, StringComparison.OrdinalIgnoreCase)));
 
-    /// <summary>Compiles the open graph in memory. Nothing is written to disk.</summary>
+    /// <summary>Compiles the open graph in memory on this thread. Nothing is written to disk.</summary>
     public GraphCompilationResult Compile()
     {
+        compileRequest++;
         LastCompilation = Compiler.Compile(Graph.Graph, Project.CompilationOptions, Graph.RelativePath);
         return LastCompilation;
     }
+
+    /// <summary>
+    /// Compiles the open graph on a background thread from a snapshot of the project, so editing continues meanwhile. Returns null,
+    /// leaving <see cref="LastCompilation"/> alone, when another compilation started before this one finished. Call on the UI thread.
+    /// </summary>
+    public async Task<GraphCompilationResult?> CompileInBackgroundAsync()
+    {
+        int request = ++compileRequest;
+        VisualProject snapshot = Snapshot();
+        ProjectGraph graph = snapshot.Graphs.First(candidate => candidate.Graph.Id == Graph.Graph.Id);
+        GraphCompiler compiler = Compiler;
+        GraphCompilationResult result = await Task.Run(() => compiler.Compile(graph.Graph, snapshot.CompilationOptions, graph.RelativePath)).ConfigureAwait(true);
+        if (request != compileRequest)
+        {
+            return null;
+        }
+
+        LastCompilation = result;
+        return result;
+    }
+
+    /// <summary>
+    /// A read-only copy of the project for compiling, verifying, generating, and navigating on a background thread. Graphs that
+    /// have not changed since the last snapshot share their copy with it. Call on the UI thread.
+    /// </summary>
+    public VisualProject Snapshot() => Project.Snapshot(graph =>
+    {
+        int version = versions.GetValueOrDefault(graph);
+        if (copies.TryGetValue(graph, out (int Version, GraphDocument Copy) copy) && copy.Version == version)
+        {
+            return copy.Copy;
+        }
+
+        GraphDocument fresh = graph.Clone();
+        copies[graph] = (version, fresh);
+        return fresh;
+    });
 
     public void Save()
     {
@@ -265,7 +324,11 @@ internal sealed class Workspace
         if (!editors.TryGetValue(graph.Graph, out GraphEditor? editor))
         {
             editor = new GraphEditor(graph.Graph, Compiler.Library) { ProjectGraphs = Project.GraphDocuments };
-            editor.Changed += (_, _) => Changed?.Invoke(this, EventArgs.Empty);
+            editor.Changed += (_, _) =>
+            {
+                versions[graph.Graph] = versions.GetValueOrDefault(graph.Graph) + 1;
+                Changed?.Invoke(this, EventArgs.Empty);
+            };
             editors.Add(graph.Graph, editor);
         }
 

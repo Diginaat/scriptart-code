@@ -174,7 +174,7 @@ public static class ExternalApi
     {
         CSharpCompilation compilation = CSharpCompilation.Create(
             "ExternalApiDiscovery",
-            references: [.. RoslynVerifier.RuntimeReferences, .. assemblyPaths.Select(path => MetadataReference.CreateFromFile(path))]);
+            references: [.. RoslynVerifier.RuntimeReferences, .. assemblyPaths.Select(RoslynVerifier.FileReference)]);
 
         INamedTypeSymbol[] offered = [.. types(compilation).Where(type => type.DeclaredAccessibility == Accessibility.Public
             && type.ContainingType is null && !type.IsGenericType && !IsHidden(type))];

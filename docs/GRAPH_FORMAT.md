@@ -98,6 +98,8 @@ Copied nodes and comments are placed on the system clipboard as text in the grap
 - Version 5 → 6: adds an empty `properties` array.
 - Version 6 → 7: nothing to convert; an absent `owner` means a function of the program class.
 - Version 7 → 8: adds an empty `typeParameters`. Constructor graphs are new files, so nothing else changes.
-- Older files (including the checked-in samples, which are version 1) open unchanged and are written in the current version on the next save.
+- Older files (including the checked-in samples, which use versions 1 to 7) open unchanged and are written in the current version on the next save. The IDE notes such files in Output when a project opens.
+- `vside migrate --check <project>` lists outdated files and the steps that would convert them (exit code 1 when there are any); `vside migrate <project>` converts every outdated file, after copying the originals to `MigrationBackup/<timestamp>/`. If any file cannot be read, nothing is written.
+- Steps are listed in `GraphSerializer.Migrations`; `MigrationTests` checks that every version has exactly one, in order.
 - `SerializationTests.Version1FileFromDiskLoads` keeps a literal version-1 file; it must keep passing for as long as version 1 is supported.
 - Corrupted files produce `GraphFormatException` with the file path and reason. The previous file on disk is never touched by a failed load.

@@ -25,6 +25,9 @@ public static class RoslynVerifier
 {
     private static readonly Lazy<MetadataReference[]> RuntimeReferenceList = new(LoadRuntimeReferences);
 
+    // Reading an assembly's metadata is the costly part of setting up a compilation; a file is read again only when it changes.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string Path, DateTime Written, long Length), MetadataReference> FileReferences = new();
+
     /// <summary>The framework assemblies of the running runtime.</summary>
     internal static IReadOnlyList<MetadataReference> RuntimeReferences => RuntimeReferenceList.Value;
 
@@ -69,10 +72,29 @@ public static class RoslynVerifier
         return CSharpCompilation.Create(
             assemblyName,
             [.. sources.Select(source => CSharpSyntaxTree.ParseText(source.Text, parseOptions, source.Path))],
-            [.. RuntimeReferences, .. (referencePaths ?? []).Select(path => MetadataReference.CreateFromFile(path))],
+            [.. RuntimeReferences, .. (referencePaths ?? []).Select(FileReference)],
             new CSharpCompilationOptions(
                 isExecutable ? OutputKind.ConsoleApplication : OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
+    }
+
+    /// <summary>The metadata of the assembly at <paramref name="path"/>, read once per version of the file.</summary>
+    internal static MetadataReference FileReference(string path)
+    {
+        var file = new FileInfo(path);
+        (string Path, DateTime Written, long Length) key = (file.FullName, file.LastWriteTimeUtc, file.Exists ? file.Length : -1);
+        if (FileReferences.TryGetValue(key, out MetadataReference? cached))
+        {
+            return cached;
+        }
+
+        // A rebuilt project reference replaces its assembly; earlier versions of the file are never used again.
+        foreach (var stale in FileReferences.Keys.Where(other => other.Path == key.Path))
+        {
+            FileReferences.TryRemove(stale, out _);
+        }
+
+        return FileReferences.GetOrAdd(key, _ => MetadataReference.CreateFromFile(key.Path));
     }
 
     private static MetadataReference[] LoadRuntimeReferences()

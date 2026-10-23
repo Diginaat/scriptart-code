@@ -461,7 +461,8 @@ public sealed partial class MainWindow : Window
         }
 
         EndDebugging();
-        workspace = Workspace.Open(project);
+        OutputEditor.Text = "";
+        workspace = Workspace.Open(project, ApprovedNodeLibraries());
         workspace.Changed += OnGraphChanged;
         fileDiagnostics = [];
         shownFile = null;
@@ -470,13 +471,36 @@ public sealed partial class MainWindow : Window
         CodeEditor.IsReadOnly = true;
         loadingCode = false;
         EmptyState.IsVisible = false;
-        OutputEditor.Text = "";
         ProjectText.Text = $"{project.Name}  ·  {project.DirectoryPath}";
         ShowOpenGraph();
         CheckHandwrittenCode();
+        foreach (string problem in workspace.LibraryProblems)
+        {
+            AppendOutput(problem);
+        }
+
+        ReportOutdatedSchema(project);
         if (workspace.References.PackagesNotRestored)
         {
             SetStatus("The project's NuGet packages are not restored yet. Build once (Ctrl+Shift+B) to add their methods to the palette.");
+        }
+    }
+
+    /// <summary>Tells the user when the project's files use an older schema, which saving upgrades for good.</summary>
+    private void ReportOutdatedSchema(VisualProject project)
+    {
+        try
+        {
+            int outdated = ProjectMigration.Inspect(project.ProjectFilePath).Count(file => file.IsOutdated);
+            if (outdated > 0)
+            {
+                AppendOutput($"{outdated} file(s) of this project use an older format. Saving writes the current format, which older versions of "
+                    + "ScriptArt Code cannot open. To upgrade every file at once, with a backup, run: vside migrate " + project.ProjectFilePath);
+            }
+        }
+        catch (Exception exception) when (exception is GraphFormatException or IOException or UnauthorizedAccessException)
+        {
+            // The project loaded, so its files are readable; a file changed since then is reported when it is used.
         }
     }
 
@@ -510,17 +534,25 @@ public sealed partial class MainWindow : Window
         RefreshProjectPanel();
     }
 
-    private void Recompile()
+    /// <summary>Compiles the open graph in the background and shows the result, unless a newer compilation or another project replaced it.</summary>
+    private async void Recompile()
     {
-        if (workspace is not null)
+        if (workspace is not { } current)
         {
-            ShowCompilation(workspace.Compile());
+            return;
+        }
 
-            // Details lists the selected node's problems, which the edit that started this compilation may have changed.
-            if (GraphCanvas.SelectedItems.Count == 1)
-            {
-                ShowInspector();
-            }
+        if (await current.CompileInBackgroundAsync() is not { } result || workspace != current)
+        {
+            return;
+        }
+
+        ShowCompilation(result);
+
+        // Details lists the selected node's problems, which the edit that started this compilation may have changed.
+        if (GraphCanvas.SelectedItems.Count == 1)
+        {
+            ShowInspector();
         }
     }
 

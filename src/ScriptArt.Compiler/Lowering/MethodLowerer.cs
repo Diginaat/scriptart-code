@@ -16,7 +16,7 @@ namespace ScriptArt.Compiler.Lowering;
 /// once into a local declared just before that statement. Values produced by statement nodes live in locals and are
 /// only visible in the block that declares them and its nested blocks, matching C# scoping.
 /// </remarks>
-internal sealed class MethodLowerer
+internal sealed class MethodLowerer : ILoweringHost
 {
     private readonly GraphIndex index;
     private readonly ExecutionFlow flow;
@@ -45,12 +45,12 @@ internal sealed class MethodLowerer
     }
 
     /// <summary>The ids of the project's graphs that generate async methods, which callers await.</summary>
-    internal IReadOnlySet<string> AsyncGraphs { get; }
+    public IReadOnlySet<string> AsyncGraphs { get; }
 
-    internal TypeSystem.TypeRef ReturnType { get; }
+    public TypeSystem.TypeRef ReturnType { get; }
 
     /// <summary>The program class, when the graph is a method of another type and calls to functions must name it; otherwise null.</summary>
-    internal TypeSystem.TypeRef? FunctionHost { get; }
+    public TypeSystem.TypeRef? FunctionHost { get; }
 
     private string GraphId => index.Graph.Id;
 
@@ -96,14 +96,14 @@ internal sealed class MethodLowerer
             .Where(parameter => parameter.Type is not null)
             .Select(parameter => new IrParameter(parameter.Name, parameter.Type!))];
 
-    internal IrLocal ParameterLocal(string parameterId) =>
+    public IrLocal ParameterLocal(string parameterId) =>
         parameters.TryGetValue(parameterId, out IrLocal? local)
             ? local
             : throw new ArgumentException($"The graph declares no parameter '{parameterId}'.", nameof(parameterId));
 
-    internal void BindLocal(ResolvedNode node, string pinId, IrLocal local) => scopes[^1].Add(new PinRef(node.Id, pinId), local);
+    public void BindLocal(ResolvedNode node, string pinId, IrLocal local) => scopes[^1].Add(new PinRef(node.Id, pinId), local);
 
-    internal IrLocal VariableLocal(string variableId) =>
+    public IrLocal VariableLocal(string variableId) =>
         variables.TryGetValue(variableId, out IrLocal? local)
             ? local
             : throw new ArgumentException($"The graph declares no variable '{variableId}'.", nameof(variableId));
@@ -142,7 +142,7 @@ internal sealed class MethodLowerer
         return declarations;
     }
 
-    internal IrBlock LowerBranch(ResolvedNode node, string executionPinId)
+    public IrBlock LowerBranch(ResolvedNode node, string executionPinId)
     {
         PinDefinition pin = node.Definition.FindPin(executionPinId)
             ?? throw new ArgumentException($"Node type '{node.Definition.TypeId}' has no pin '{executionPinId}'.", nameof(executionPinId));
@@ -157,19 +157,19 @@ internal sealed class MethodLowerer
     }
 
     /// <summary>True when Break and Continue are allowed: inside a loop body that does not enclose the innermost Finally block.</summary>
-    internal bool IsInLoopBody => blocks.LastIndexOf(NestedBlock.LoopBody) > blocks.LastIndexOf(NestedBlock.Finally);
+    public bool IsInLoopBody => blocks.LastIndexOf(NestedBlock.LoopBody) > blocks.LastIndexOf(NestedBlock.Finally);
 
     /// <summary>True inside a Finally block, which control cannot leave with return.</summary>
-    internal bool IsInFinally => blocks.Contains(NestedBlock.Finally);
+    public bool IsInFinally => blocks.Contains(NestedBlock.Finally);
 
     /// <summary>True inside a Catch block that does not enclose the innermost Finally block, where <c>throw;</c> is allowed (CS0724).</summary>
-    internal bool IsInCatch => blocks.LastIndexOf(NestedBlock.Catch) > blocks.LastIndexOf(NestedBlock.Finally);
+    public bool IsInCatch => blocks.LastIndexOf(NestedBlock.Catch) > blocks.LastIndexOf(NestedBlock.Finally);
 
     /// <summary>
     /// Lowers the body of a loop node. <paramref name="loopValues"/> are the node's data outputs that only exist inside the body,
     /// such as a For Loop's index.
     /// </summary>
-    internal IrBlock LowerLoopBody(ResolvedNode node, string executionPinId, IReadOnlyList<(string PinId, IrLocal Local)> loopValues)
+    public IrBlock LowerLoopBody(ResolvedNode node, string executionPinId, IReadOnlyList<(string PinId, IrLocal Local)> loopValues)
     {
         PinDefinition pin = node.Definition.FindPin(executionPinId)
             ?? throw new ArgumentException($"Node type '{node.Definition.TypeId}' has no pin '{executionPinId}'.", nameof(executionPinId));
@@ -182,7 +182,7 @@ internal sealed class MethodLowerer
     }
 
     /// <summary>Lowers the nested block reached through a pin created with <see cref="PinDefinition.Block"/> or <see cref="PinDefinition.LoopBody"/>.</summary>
-    internal IrBlock LowerNestedBlock(ResolvedNode node, string executionPinId, NestedBlock kind, IReadOnlyList<(string PinId, IrLocal Local)> values)
+    public IrBlock LowerNestedBlock(ResolvedNode node, string executionPinId, NestedBlock kind, IReadOnlyList<(string PinId, IrLocal Local)> values)
     {
         PinDefinition pin = node.Definition.FindPin(executionPinId)
             ?? throw new ArgumentException($"Node type '{node.Definition.TypeId}' has no pin '{executionPinId}'.", nameof(executionPinId));
@@ -204,11 +204,11 @@ internal sealed class MethodLowerer
         return body;
     }
 
-    internal IrLocal NewLocal(string nameHint, TypeSystem.TypeRef type) => new(AllocateName(nameHint), type);
+    public IrLocal NewLocal(string nameHint, TypeSystem.TypeRef type) => new(AllocateName(nameHint), type);
 
-    internal void ReportError(ResolvedNode node, string diagnosticId, string message) => Report(diagnosticId, message, node.Id);
+    public void ReportError(ResolvedNode node, string diagnosticId, string message) => Report(diagnosticId, message, node.Id);
 
-    internal IrExpression LowerInput(ResolvedNode node, string pinId)
+    public IrExpression LowerInput(ResolvedNode node, string pinId)
     {
         PinDefinition pin = node.Definition.FindPin(pinId)
             ?? throw new ArgumentException($"Node type '{node.Definition.TypeId}' has no pin '{pinId}'.", nameof(pinId));
@@ -234,10 +234,10 @@ internal sealed class MethodLowerer
         return value.Type == pin.DataType || value is IrError ? value : new IrConvert(value, pin.DataType);
     }
 
-    internal bool IsOutputUsed(ResolvedNode node, string pinId) =>
+    public bool IsOutputUsed(ResolvedNode node, string pinId) =>
         index.ConnectionsFrom(new PinRef(node.Id, pinId)).Count > 0;
 
-    internal IrLocal DeclareLocal(ResolvedNode node, string pinId, string nameHint, TypeSystem.TypeRef type)
+    public IrLocal DeclareLocal(ResolvedNode node, string pinId, string nameHint, TypeSystem.TypeRef type)
     {
         var local = new IrLocal(AllocateName(nameHint), type);
         scopes[^1].Add(new PinRef(node.Id, pinId), local);
@@ -387,13 +387,4 @@ internal sealed class MethodLowerer
 
     private void Report(string id, string message, string nodeId, PinRef? pin = null) =>
         diagnostics.Add(new(id, DiagnosticSeverity.Error, message, GraphId, nodeId, pin));
-}
-
-/// <summary>The kinds of nested block. They decide where Break, Continue, and Return are allowed.</summary>
-public enum NestedBlock
-{
-    LoopBody,
-    Try,
-    Catch,
-    Finally,
 }

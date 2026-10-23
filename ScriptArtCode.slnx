@@ -5,6 +5,7 @@
     <Project Path="src/ScriptArt.Compiler/ScriptArt.Compiler.csproj" />
     <Project Path="src/ScriptArt.GraphModel/ScriptArt.GraphModel.csproj" />
     <Project Path="src/ScriptArt.NodeEditor/ScriptArt.NodeEditor.csproj" />
+    <Project Path="src/ScriptArt.NodeSdk/ScriptArt.NodeSdk.csproj" />
     <Project Path="src/ScriptArt.ProjectSystem/ScriptArt.ProjectSystem.csproj" />
   </Folder>
   <Folder Name="/tests/">

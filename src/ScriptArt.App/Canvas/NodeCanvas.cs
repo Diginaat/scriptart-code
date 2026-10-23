@@ -57,6 +57,14 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     // Pins with at least one wire, rebuilt with the layouts; drawing checks every visible pin each frame.
     private readonly HashSet<PinRef> connectedPins = [];
 
+    // Where nodes and wires are, so drawing and hit-testing look only at what is near (D-040). Rebuilt with the layouts and
+    // updated for the items a drag moves. The order maps give graph order: later nodes draw on top and are hit first.
+    private readonly SpatialIndex<string> nodeIndex = new();
+    private readonly SpatialIndex<GraphConnection> wireIndex = new();
+    private readonly Dictionary<string, int> nodeOrder = new(StringComparer.Ordinal);
+    private readonly Dictionary<GraphConnection, int> wireOrder = [];
+    private readonly Dictionary<string, List<GraphConnection>> wiresByNode = new(StringComparer.Ordinal);
+
     // The minimap's nodes as one geometry per category color, and their bounds; null when layouts have changed since.
     private (Rect Bounds, (IBrush Brush, Geometry Geometry)[] Groups)? minimapNodes;
     private readonly double[] frameTimes = new double[120];
@@ -327,13 +335,10 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
             }
 
             DrawConnections(context, visibleWorld);
-            foreach (GraphNode node in editor.Graph.Nodes)
+            foreach (string id in NodesIn(visibleWorld).OrderBy(id => nodeOrder[id]))
             {
-                if (layouts.TryGetValue(node.Id, out NodeLayout? layout) && layout.Bounds.Intersects(visibleWorld))
-                {
-                    DrawNode(context, layout);
-                    drawnNodes++;
-                }
+                DrawNode(context, layouts[id]);
+                drawnNodes++;
             }
 
             if (gesture == Gesture.Connecting && connectFrom is not null && FindPinLayout(connectFrom) is { } start)
@@ -548,6 +553,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
                     {
                         (layout.Node.X, layout.Node.Y) = (x, y);
                         layouts[start.Id] = NodeLayout.Create(layout.Node, layout.Definition, MeasureText);
+                        IndexNode(start.Id);
                         minimapNodes = null;
                     }
                     else if (editor.Graph.FindComment(start.Id) is { } moved)
@@ -562,6 +568,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
             case Gesture.MovingReroute when draggingReroute is { } reroute:
                 Vector rerouteDelta = (screen - pressScreen) / zoom;
                 reroute.Connection.Points![reroute.Index] = new GraphPoint(Math.Round(reroute.Start.X + rerouteDelta.X), Math.Round(reroute.Start.Y + rerouteDelta.Y));
+                IndexWire(reroute.Connection);
                 InvalidateVisual();
                 break;
 
@@ -633,10 +640,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
             case Gesture.Marquee:
                 Rect marquee = MarqueeWorld();
-                foreach (NodeLayout layout in layouts.Values.Where(layout => marquee.Intersects(layout.Bounds)))
-                {
-                    selection.Add(layout.Node.Id);
-                }
+                selection.UnionWith(NodesIn(marquee));
 
                 // Comments are large; select them only when the box encloses them completely.
                 selection.UnionWith(editor.Graph.Comments.Where(comment => marquee.Contains(BoundsOf(comment))).Select(comment => comment.Id));
@@ -751,6 +755,11 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     {
         layouts.Clear();
         connectedPins.Clear();
+        nodeIndex.Clear();
+        wireIndex.Clear();
+        nodeOrder.Clear();
+        wireOrder.Clear();
+        wiresByNode.Clear();
         minimapNodes = null;
         if (textCache.Count > 4096)
         {
@@ -766,15 +775,68 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
         foreach (GraphNode node in editor.Graph.Nodes)
         {
             layouts[node.Id] = NodeLayout.Create(node, editor.DefinitionOf(node) ?? editor.PlaceholderFor(node), MeasureText);
+            nodeOrder[node.Id] = nodeOrder.Count;
+            nodeIndex.Set(node.Id, ToArea(layouts[node.Id].Bounds));
         }
 
         foreach (GraphConnection connection in editor.Graph.Connections)
         {
             connectedPins.Add(connection.From);
             connectedPins.Add(connection.To);
+            wireOrder[connection] = wireOrder.Count;
+            foreach (string node in (string[])[connection.From.Node, connection.To.Node])
+            {
+                if (!wiresByNode.TryGetValue(node, out List<GraphConnection>? wires))
+                {
+                    wiresByNode[node] = wires = [];
+                }
+
+                wires.Add(connection);
+            }
+
+            IndexWire(connection);
         }
 
         InvalidateVisual();
+    }
+
+    private static Area ToArea(Rect rect) => new(rect.X, rect.Y, rect.Width, rect.Height);
+
+    /// <summary>The ids of the nodes whose bounds intersect <paramref name="world"/>, in no particular order.</summary>
+    private IReadOnlyCollection<string> NodesIn(Rect world) => nodeIndex.Query(ToArea(world));
+
+    // Updates the index for a node whose layout changed, and for its wires.
+    private void IndexNode(string nodeId)
+    {
+        nodeIndex.Set(nodeId, ToArea(layouts[nodeId].Bounds));
+        foreach (GraphConnection connection in wiresByNode.GetValueOrDefault(nodeId) ?? [])
+        {
+            IndexWire(connection);
+        }
+    }
+
+    // A wire stays near the nodes it joins and its reroute points; its curve bulges at most this far beyond them.
+    private void IndexWire(GraphConnection connection)
+    {
+        if (!layouts.TryGetValue(connection.From.Node, out NodeLayout? fromNode) || !layouts.TryGetValue(connection.To.Node, out NodeLayout? toNode))
+        {
+            return;
+        }
+
+        Rect reach = fromNode.Bounds.Union(toNode.Bounds);
+        foreach (GraphPoint point in connection.Points ?? [])
+        {
+            reach = reach.Union(new Rect(point.X, point.Y, 0, 0));
+        }
+
+        wireIndex.Set(connection, ToArea(reach.Inflate(120)));
+    }
+
+    /// <summary>The wires that may pass through <paramref name="world"/>, in graph order or, with <paramref name="topFirst"/>, reversed.</summary>
+    private IEnumerable<GraphConnection> WiresIn(Rect world, bool topFirst = false)
+    {
+        IEnumerable<GraphConnection> wires = wireIndex.Query(ToArea(world)).Where(wireOrder.ContainsKey);
+        return topFirst ? wires.OrderByDescending(wire => wireOrder[wire]) : wires.OrderBy(wire => wireOrder[wire]);
     }
 
     private void RequestValueEdit(NodeLayout layout) =>
@@ -1135,21 +1197,9 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
     private void DrawConnections(DrawingContext context, Rect visible)
     {
-        foreach (GraphConnection connection in editor!.Graph.Connections)
+        foreach (GraphConnection connection in WiresIn(visible))
         {
-            // Cheap test first: a wire stays near the nodes it joins and its reroute points.
-            if (!layouts.TryGetValue(connection.From.Node, out NodeLayout? fromNode) || !layouts.TryGetValue(connection.To.Node, out NodeLayout? toNode))
-            {
-                continue;
-            }
-
-            Rect reach = fromNode.Bounds.Union(toNode.Bounds);
-            foreach (GraphPoint point in connection.Points ?? [])
-            {
-                reach = reach.Union(new Rect(point.X, point.Y, 0, 0));
-            }
-
-            if (!reach.Inflate(120).Intersects(visible) || WirePath(connection) is not { } wire)
+            if (WirePath(connection) is not { } wire)
             {
                 continue;
             }
@@ -1203,9 +1253,8 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     private (GraphConnection Connection, int Segment)? HitWire(Point world)
     {
         double tolerance = CanvasTheme.WireHitDistance / Math.Min(zoom, 1);
-        for (int c = editor!.Graph.Connections.Count - 1; c >= 0; c--)
+        foreach (GraphConnection connection in WiresIn(new Rect(world, world).Inflate(tolerance), topFirst: true))
         {
-            GraphConnection connection = editor.Graph.Connections[c];
             if (WirePath(connection) is not { } wire)
             {
                 continue;
@@ -1249,9 +1298,8 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     private (GraphConnection Connection, int Index)? HitReroute(Point world)
     {
         double hitRadius = CanvasTheme.PinHitRadius / Math.Min(zoom, 1);
-        for (int c = editor!.Graph.Connections.Count - 1; c >= 0; c--)
+        foreach (GraphConnection connection in WiresIn(new Rect(world, world).Inflate(hitRadius), topFirst: true))
         {
-            GraphConnection connection = editor.Graph.Connections[c];
             for (int i = 0; i < (connection.Points?.Count ?? 0); i++)
             {
                 if (Point.Distance(new Point(connection.Points![i].X, connection.Points[i].Y), world) <= hitRadius)
@@ -1419,9 +1467,10 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
     private PinRef? HitPin(Point world)
     {
         double hitRadius = CanvasTheme.PinHitRadius / Math.Min(zoom, 1);
-        for (int i = editor!.Graph.Nodes.Count - 1; i >= 0; i--)
+        foreach (string id in NodesIn(new Rect(world, world).Inflate(hitRadius)).OrderByDescending(id => nodeOrder[id]))
         {
-            if (!layouts.TryGetValue(editor.Graph.Nodes[i].Id, out NodeLayout? layout) || !layout.Bounds.Inflate(hitRadius).Contains(world))
+            NodeLayout layout = layouts[id];
+            if (!layout.Bounds.Inflate(hitRadius).Contains(world))
             {
                 continue;
             }
@@ -1438,18 +1487,9 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
         return null;
     }
 
-    private NodeLayout? HitNode(Point world)
-    {
-        for (int i = editor!.Graph.Nodes.Count - 1; i >= 0; i--)
-        {
-            if (layouts.TryGetValue(editor.Graph.Nodes[i].Id, out NodeLayout? layout) && layout.Bounds.Contains(world))
-            {
-                return layout;
-            }
-        }
-
-        return null;
-    }
+    private NodeLayout? HitNode(Point world) =>
+        NodesIn(new Rect(world, world)).Select(id => layouts[id]).Where(layout => layout.Bounds.Contains(world))
+            .MaxBy(layout => nodeOrder[layout.Node.Id]);
 
     private Rect MarqueeWorld() => new Rect(ToWorld(pressScreen), ToWorld(lastScreen)).Normalize();
 

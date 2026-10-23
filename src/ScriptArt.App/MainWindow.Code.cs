@@ -132,13 +132,14 @@ public partial class MainWindow
 
         int version = ++checkVersion;
         VisualProject project = workspace.Project;
+        VisualProject snapshot = workspace.Snapshot();
         GraphCompiler compiler = workspace.Compiler;
         IReadOnlyDictionary<string, string> unsaved = workspace.UnsavedFiles;
         HashSet<string> files = new(workspace.SourceFiles, StringComparer.OrdinalIgnoreCase);
         ProjectGenerationResult result;
         try
         {
-            result = await Task.Run(() => project.PreviewGeneration(compiler, unsaved));
+            result = await Task.Run(() => snapshot.PreviewGeneration(compiler, unsaved));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -235,6 +236,7 @@ public partial class MainWindow
         }
 
         VisualProject project = workspace.Project;
+        VisualProject snapshot = workspace.Snapshot();
         GraphCompiler compiler = workspace.Compiler;
         string path = shownFile ?? project.GeneratedPath(workspace.Graph.Graph);
         int offset = CodeEditor.CaretOffset;
@@ -243,7 +245,7 @@ public partial class MainWindow
         ProjectDefinition? definition;
         try
         {
-            definition = await Task.Run(() => project.FindDefinition(compiler, path, offset, unsaved));
+            definition = await Task.Run(() => snapshot.FindDefinition(compiler, path, offset, unsaved));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -260,8 +262,15 @@ public partial class MainWindow
         {
             SetStatus("There is no name with a definition at the cursor.");
         }
-        else if (definition.Graph is { } graph)
+        else if (definition.Graph is { } copy)
         {
+            // The lookup ran on a snapshot; open the project's own graph, unless it was removed meanwhile.
+            if (project.Graphs.FirstOrDefault(candidate => candidate.Graph.Id == copy.Graph.Id) is not { } graph)
+            {
+                SetStatus($"{definition.SymbolName} was defined in a graph that no longer exists.");
+                return;
+            }
+
             if (graph != workspace.Graph)
             {
                 OpenProjectGraph(graph);

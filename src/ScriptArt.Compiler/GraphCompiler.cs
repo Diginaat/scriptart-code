@@ -20,6 +20,13 @@ public sealed record GraphCompilationOptions(string RootNamespace, IReadOnlyList
 {
     public IReadOnlyList<GraphDocument> Graphs { get; init; } = Graphs ?? [];
 
+    /// <summary>
+    /// The ids of the async graphs among <see cref="Graphs"/>, when the caller already computed them with
+    /// <see cref="GraphCompiler.AsyncGraphs"/>; null to compute them per compiled graph. Compiling many graphs of one project
+    /// otherwise walks every graph once per graph.
+    /// </summary>
+    public IReadOnlySet<string>? AsyncGraphIds { get; init; }
+
     /// <summary>The function graphs among <see cref="Graphs"/> that are methods of <see cref="HostClass"/>, not of a class or struct.</summary>
     public IReadOnlyList<GraphDocument> Functions => [.. Graphs.Where(graph => graph.Kind == GraphKind.Function && graph.Owner is null)];
 }
@@ -376,7 +383,9 @@ public sealed class GraphCompiler(NodeLibrary library)
             return null;
         }
 
-        IReadOnlySet<string> asyncGraphs = AsyncGraphs(options.Graphs.Contains(graph) ? options.Graphs : [.. options.Graphs, graph]);
+        IReadOnlySet<string> asyncGraphs = options.AsyncGraphIds is { } known && options.Graphs.Contains(graph)
+            ? known
+            : AsyncGraphs(options.Graphs.Contains(graph) ? options.Graphs : [.. options.Graphs, graph]);
         bool isAsync = asyncGraphs.Contains(graph.Id);
         if (isFunction)
         {

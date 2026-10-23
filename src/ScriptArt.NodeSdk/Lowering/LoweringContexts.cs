@@ -8,7 +8,7 @@ namespace ScriptArt.Compiler.Lowering;
 /// </summary>
 public class ExpressionLoweringContext
 {
-    private protected ExpressionLoweringContext(MethodLowerer lowerer, ResolvedNode node)
+    private protected ExpressionLoweringContext(ILoweringHost lowerer, ResolvedNode node)
     {
         Lowerer = lowerer;
         Node = node;
@@ -16,7 +16,7 @@ public class ExpressionLoweringContext
 
     public string NodeId => Node.Id;
 
-    private protected MethodLowerer Lowerer { get; }
+    private protected ILoweringHost Lowerer { get; }
 
     private protected ResolvedNode Node { get; }
 
@@ -58,7 +58,7 @@ public class ExpressionLoweringContext
             : new IrError(property.Type);
     }
 
-    internal static ExpressionLoweringContext Create(MethodLowerer lowerer, ResolvedNode node) => new(lowerer, node);
+    internal static ExpressionLoweringContext Create(ILoweringHost lowerer, ResolvedNode node) => new(lowerer, node);
 }
 
 /// <summary>
@@ -68,7 +68,7 @@ public sealed class StatementLoweringContext : ExpressionLoweringContext
 {
     private readonly IrBlock block;
 
-    internal StatementLoweringContext(MethodLowerer lowerer, ResolvedNode node, IrBlock block)
+    internal StatementLoweringContext(ILoweringHost lowerer, ResolvedNode node, IrBlock block)
         : base(lowerer, node)
     {
         this.block = block;

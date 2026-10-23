@@ -45,6 +45,26 @@ Most definitions are registered once and shared by every node of their type. Get
 - Register definitions with `NodeLibrary.Register`. The built-in set is created by `NodeLibrary.CreateDefault()`.
 - Test new nodes like the built-ins: assert the generated text in `CodeGenerationTests` and, for anything with runtime behavior, add an integration test that builds and runs it.
 
-## Third-party libraries
+## Node libraries
 
-Loading node libraries from external assemblies is not implemented yet (Phase 6). Such libraries execute code inside the IDE with the user's permissions and must be treated as untrusted; the plan is explicit user opt-in per library, no automatic loading from opened projects.
+A node library is a class library that references the `ScriptArt.NodeSdk` package (which brings `ScriptArt.GraphModel`) and contains one or more public classes implementing `INodeProvider`:
+
+```csharp
+public sealed class Shout() : PureNodeDefinition("acme.shout", "Shout", "Acme", "Adds an exclamation mark.",
+    [PinDefinition.DataIn("text", "Text", TypeRef.String), PinDefinition.DataOut("result", "Result", TypeRef.String)])
+{
+    public override IrExpression Lower(ExpressionLoweringContext context) =>
+        new IrStaticCall(TypeRef.String, "Concat", [context.Input("text"), new IrLiteral("!", TypeRef.String)], TypeRef.String);
+}
+
+public sealed class AcmeNodes : INodeProvider
+{
+    public IEnumerable<NodeDefinition> CreateNodes() => [new Shout()];
+}
+```
+
+- Prefix type IDs with your own name (`acme.`). A node whose type ID is already in use is skipped and reported; the built-in node keeps it.
+- Target the same SDK version as the IDE. The SDK and graph model are shared with the IDE; other dependencies load beside your assembly from its folder (its `.deps.json` is honored).
+- `CreateNodes` runs when the library loads. Keep it fast and free of side effects; an exception is reported and the library adds no nodes.
+
+Loading a library runs its code with the user's permissions (D-038). The IDE loads only libraries approved in **Tools → Node Libraries**, which warns before approving and records the file's SHA-256 for the current user; a library whose file changes is not loaded until approved again, and opening a project never loads one. From the command line, name each library: `vside build --node-library Acme.Nodes.dll MyApp.vside`. A project that uses a library's nodes needs that library wherever it is generated; the generated C# does not need it.

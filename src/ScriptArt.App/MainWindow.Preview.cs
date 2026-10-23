@@ -40,7 +40,7 @@ public partial class MainWindow
         SetBusy(true, "Verifying C# and comparing with the generated files…");
         try
         {
-            VisualProject project = workspace.Project;
+            VisualProject project = workspace.Snapshot();
             GraphCompiler compiler = workspace.Compiler;
             IReadOnlyDictionary<string, string> unsaved = workspace.UnsavedFiles;
             ProjectGenerationResult result = await Task.Run(() => project.PreviewGeneration(compiler, unsaved));

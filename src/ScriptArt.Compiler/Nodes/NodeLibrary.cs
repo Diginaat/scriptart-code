@@ -7,15 +7,23 @@ namespace ScriptArt.Compiler.Nodes;
 /// <summary>
 /// The set of node definitions available to a project, keyed by <see cref="NodeDefinition.TypeId"/>.
 /// </summary>
+/// <remarks>
+/// Safe to read from several threads while one thread registers: registration builds new dictionaries and publishes them whole,
+/// so a reader sees the library before or after a registration, never during one.
+/// </remarks>
 public sealed class NodeLibrary
 {
-    private readonly Dictionary<string, NodeDefinition> definitions = new(StringComparer.Ordinal);
+    private readonly Lock registration = new();
+
+    private volatile int version;
+
+    private volatile Dictionary<string, NodeDefinition> definitions = new(StringComparer.Ordinal);
 
     // Generic .NET methods, whose nodes are built per node from the type arguments it stores.
-    private readonly Dictionary<string, ExternalMethod> genericMethods = new(StringComparer.Ordinal);
+    private volatile Dictionary<string, ExternalMethod> genericMethods = new(StringComparer.Ordinal);
 
     // .NET types graphs can hold values of, by SourceName.
-    private readonly Dictionary<string, ExternalType> externalTypes = new(StringComparer.Ordinal);
+    private volatile Dictionary<string, ExternalType> externalTypes = new(StringComparer.Ordinal);
 
     // Variable nodes get their pins from the variable they refer to. Definitions are immutable, so one is shared per variable state.
     private readonly ConcurrentDictionary<(string Id, string Name, TypeRef Type, bool Set), NodeDefinition> variableDefinitions = new();
@@ -25,6 +33,9 @@ public sealed class NodeLibrary
     private readonly ConcurrentDictionary<string, NodeDefinition> generatedDefinitions = new(StringComparer.Ordinal);
 
     public IEnumerable<NodeDefinition> Definitions => definitions.Values;
+
+    /// <summary>Changes whenever nodes or types are registered, so results computed from the library can be cached by it.</summary>
+    public int Version => version;
 
     /// <summary>The .NET types graphs can hold values of, such as <c>System.Text.StringBuilder</c>, in name order.</summary>
     public IEnumerable<ExternalType> ExternalTypes => externalTypes.Values.OrderBy(type => type.Type.SourceName, StringComparer.Ordinal);
@@ -39,10 +50,53 @@ public sealed class NodeLibrary
     public void Register(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        if (!definitions.TryAdd(definition.TypeId, definition))
+        RegisterAll([definition]);
+    }
+
+    /// <summary>Registers several definitions at once. Throws, and registers none, when a type ID is already registered.</summary>
+    public void RegisterAll(IEnumerable<NodeDefinition> added)
+    {
+        ArgumentNullException.ThrowIfNull(added);
+        lock (registration)
         {
-            throw new InvalidOperationException($"A node definition with type '{definition.TypeId}' is already registered.");
+            Dictionary<string, NodeDefinition> next = new(definitions, StringComparer.Ordinal);
+            foreach (NodeDefinition definition in added)
+            {
+                if (!next.TryAdd(definition.TypeId, definition))
+                {
+                    throw new InvalidOperationException($"A node definition with type '{definition.TypeId}' is already registered.");
+                }
+            }
+
+            definitions = next;
+            version++;
         }
+    }
+
+    /// <summary>
+    /// Registers the nodes of a node library loaded with <see cref="NodeLibraryLoader"/>, skipping (and returning a problem for)
+    /// each node whose type ID is already registered.
+    /// </summary>
+    public IReadOnlyList<string> RegisterLibrary(NodeLibraryContents contents)
+    {
+        ArgumentNullException.ThrowIfNull(contents);
+        List<string> problems = [];
+        List<NodeDefinition> accepted = [];
+        HashSet<string> seen = new(StringComparer.Ordinal);
+        foreach (NodeDefinition definition in contents.Definitions)
+        {
+            if (Find(definition.TypeId) is not null || !seen.Add(definition.TypeId))
+            {
+                problems.Add($"{Path.GetFileName(contents.AssemblyPath)}: node type '{definition.TypeId}' is already defined, so this node was not added.");
+            }
+            else
+            {
+                accepted.Add(definition);
+            }
+        }
+
+        RegisterAll(accepted);
+        return problems;
     }
 
     public NodeDefinition? Find(string typeId) => definitions.GetValueOrDefault(typeId);
@@ -332,21 +386,32 @@ public sealed class NodeLibrary
     public void RegisterExternal(ExternalApiContents contents)
     {
         ArgumentNullException.ThrowIfNull(contents);
-        foreach (ExternalType type in contents.Types)
+        lock (registration)
         {
-            externalTypes.TryAdd(type.Type.SourceName, type);
-        }
+            Dictionary<string, ExternalType> types = new(externalTypes, StringComparer.Ordinal);
+            foreach (ExternalType type in contents.Types)
+            {
+                types.TryAdd(type.Type.SourceName, type);
+            }
 
-        foreach (ExternalMethod method in contents.Members)
-        {
-            if (method.IsGeneric)
+            Dictionary<string, ExternalMethod> generic = new(genericMethods, StringComparer.Ordinal);
+            Dictionary<string, NodeDefinition> nodes = new(definitions, StringComparer.Ordinal);
+            foreach (ExternalMethod method in contents.Members)
             {
-                genericMethods.TryAdd(method.TypeId, method);
+                if (method.IsGeneric)
+                {
+                    generic.TryAdd(method.TypeId, method);
+                }
+                else if (!nodes.ContainsKey(method.TypeId))
+                {
+                    nodes.Add(method.TypeId, ExternalApi.CreateNode(method));
+                }
             }
-            else if (Find(method.TypeId) is null)
-            {
-                Register(ExternalApi.CreateNode(method));
-            }
+
+            externalTypes = types;
+            genericMethods = generic;
+            definitions = nodes;
+            version++;
         }
     }
 }

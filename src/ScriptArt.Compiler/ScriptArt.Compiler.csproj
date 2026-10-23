@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Graph validation, intermediate representation, and C# generation. No UI dependencies. -->
   <ItemGroup>
-    <ProjectReference Include="..\ScriptArt.GraphModel\ScriptArt.GraphModel.csproj" />
+    <ProjectReference Include="..\ScriptArt.NodeSdk\ScriptArt.NodeSdk.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />

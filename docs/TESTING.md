@@ -3,8 +3,10 @@
 ```sh
 dotnet test tests/ScriptArt.Tests              # fast: no processes, ~2 s
 dotnet test tests/ScriptArt.IntegrationTests   # real dotnet build/run, ~35 s; set VSIDE_NETCOREDBG to run the debugger test
-dotnet run -c Release --project tests/ScriptArt.PerformanceTests
+dotnet run -c Release --project tests/ScriptArt.PerformanceTests -- --check tests/ScriptArt.PerformanceTests/baseline.json
 ```
+
+The performance check compares against a baseline recorded on one machine; see PERFORMANCE.md before relying on it elsewhere.
 
 ## Suites
 
@@ -20,6 +22,9 @@ dotnet run -c Release --project tests/ScriptArt.PerformanceTests
 | `MethodTests` | Class and struct methods with Self, calls with a target, functions called from methods through the program class, file names per type, member-name clashes, methods of missing types, Self offered only in methods, saving the owner, adding a method to a project. |
 | `ConstructorAndGenericTests` | Class and struct constructors through Self with a generated parameterless constructor, constructors with the same parameter types reported, generic classes with type arguments on nodes and calls, nested type names, lists of lists, adding a constructor to a project, editing type parameters. |
 | `AsyncAndDotNetMemberTests` | Typed catch and Rethrow, Rethrow outside Catch reported, Throw with a chosen type, .NET constructors, properties, and instance methods of framework value types, generic .NET methods with type arguments, async calls that make their function and its callers async, optional parameters left out. |
+| `NodeLibraryTests` | A node library compiled with Roslyn at test time, loaded, registered, and generating code; duplicate type IDs skipped; throwing, empty, non-assembly, and missing libraries reported; approval by hash, a changed file refused, removal. |
+| `MigrationTests` | The migration steps cover every version in order; `ProjectMigration` lists and converts outdated files with a backup, changes nothing when one file is unreadable, and reports files from a newer version. |
+| `IncrementalCompilationTests` | Unchanged graphs reused and edited ones recompiled; signature and async changes recompile every graph; incremental results equal a cold compile; snapshots are independent and read-only; `Clone` shares nothing mutable; metadata references cached. `SpatialIndexTests`: queries after inserts, moves, and removals match a linear scan. |
 | `TextDiffTests` | Line diff (prefix and suffix trimming, insertions, deletions, replacements), unified diff hunks and context, empty files. |
 | `CodeWorkflowTests` | Generation preview (added, modified, deleted, nothing written, ownership conflicts), adding and saving handwritten files and their protections, verification with unsaved text, Go to Definition in generated and handwritten code, the debugger startup hook. |
 | `DebuggingTests` | DAP message framing, requests, events, and reverse requests over pipes, node breakpoints to lines and back, output assembly path. |

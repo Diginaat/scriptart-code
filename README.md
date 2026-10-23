@@ -8,7 +8,7 @@ The generated program has no dependency on this IDE: no graph interpreter, no ru
 
 ## Status
 
-Phases 0 to 4 are complete: the visual editor, real programming capabilities (variables, loops, functions, collections, classes and structs, async, .NET APIs), and IDE integration (handwritten files, generation preview, Go to Definition, node debugging, solutions). See [docs/ROADMAP.md](docs/ROADMAP.md) for what exists and what comes next.
+Phases 0 to 5 are complete: the visual editor, real programming capabilities (variables, loops, functions, collections, classes and structs, async, .NET APIs), IDE integration (handwritten files, generation preview, Go to Definition, node debugging, solutions), and extensibility and performance (node libraries, migration tooling, incremental and background compilation, packaging). See [docs/ROADMAP.md](docs/ROADMAP.md) for what exists and what comes next.
 
 What works today:
 
@@ -20,7 +20,8 @@ What works today:
 - Handwritten `.cs` files edited in the IDE and checked as you type; a diff preview before generated files are written; Go to Definition (F12).
 - Debugging with breakpoints on nodes (F9, F5, F10, F11) through netcoredbg, with call stack and locals.
 - Solutions, NuGet packages, and project references through the `dotnet` CLI.
-- A headless CLI (`vside generate|diff|build|run`) for scripts and CI.
+- Node libraries from third parties, loaded only after you approve them (Tools → Node Libraries; see [docs/NODE_AUTHORING.md](docs/NODE_AUTHORING.md)).
+- A headless CLI (`vside generate|diff|build|run`, `vside migrate [--check]` to upgrade older project files with a backup) for scripts and CI.
 
 ## Example
 
@@ -58,6 +59,15 @@ dotnet test ScriptArtCode.slnx
 ```
 
 The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
+
+To produce release artifacts (the self-contained IDE per runtime, the CLI as a .NET tool, and the node SDK packages) in `artifacts/`:
+
+```sh
+eng/package.sh win-x64 linux-x64      # or: pwsh eng/package.ps1 -Runtimes win-x64
+dotnet tool install -g --add-source artifacts/packages ScriptArt.Cli
+```
+
+The published IDE starts without a .NET install; building and running projects still needs the .NET 10 SDK.
 
 ### Editor controls
 
@@ -100,19 +110,21 @@ The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 ```
 src/
   ScriptArt.GraphModel     graph documents and the versioned JSON format
+  ScriptArt.NodeSdk        public API for node libraries (node definitions, types, IR)
   ScriptArt.Compiler       validation, IR, control-flow analysis, Roslyn emission, node library
   ScriptArt.NodeEditor     undoable editing operations (no UI dependency)
   ScriptArt.ProjectSystem  project files, generated-code ownership, dotnet build/run
   ScriptArt.App            Avalonia desktop IDE
   ScriptArt.Cli            headless generate/build/run
-tests/                               unit, integration (real dotnet builds), performance harness
+tests/                               unit, integration (real dotnet builds), performance harness and baseline
+eng/                                 packaging scripts
 samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, Methods
 docs/                                architecture, compiler pipeline, formats, decisions, roadmap
 ```
 
 ## Security
 
-Opening a project never builds or runs it; building and running always require an explicit command. Treat projects from others as untrusted code: building runs MSBuild and running executes the program with your permissions.
+Opening a project never builds or runs it; building and running always require an explicit command. Treat projects from others as untrusted code: building runs MSBuild and running executes the program with your permissions. A node library runs inside the IDE with your permissions; the IDE loads only libraries you approved, and only while their files are unchanged. A project cannot load one.
 
 ## Documentation
 

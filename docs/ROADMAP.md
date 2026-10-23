@@ -64,11 +64,23 @@ Done: debugging (D-035). F9 sets a breakpoint on a node; F5 builds and runs unde
 
 Done: solution management (D-036). Project → Create Solution File (`dotnet new sln`, `.slnx`), Add NuGet Package, Add Project Reference (also added to the solution), and removing either from References, all through the `dotnet` CLI with output in Output. A referenced project's public methods become nodes after a build.
 
-Next: Phase 5. Godot 4 C# support is the last phase.
+## Phase 5 — Extensibility and performance ✅
 
-## Phase 5 — Extensibility and performance
+Done: node-library SDK and opt-in libraries (D-038). `ScriptArt.NodeSdk` holds what a node needs; a library implements `INodeProvider`. Tools → Node Libraries approves a library for the user after a warning that it runs with their permissions; the CLI takes `--node-library`. Opening a project never loads one.
 
-Node-library SDK assembly and opt-in loading of external libraries; schema migration tooling; incremental compilation; spatial indexing and background compilation; performance regression tests; packaging.
+Done: schema migration tooling. `vside migrate --check` lists files in an older format and the steps that would convert them; `vside migrate` converts all of them after backing them up to `MigrationBackup/`, or none if one cannot be read. The IDE notes outdated files in Output when a project opens.
+
+Done: incremental compilation (D-039). Only changed graphs recompile; a signature change recompiles all.
+
+Done: spatial index and background compilation (D-040, D-041). The canvas culls and hit-tests through a grid index; live compilation runs off the UI thread on snapshots.
+
+Done: performance regression tests. The performance harness compares against `tests/ScriptArt.PerformanceTests/baseline.json` with `--check`.
+
+Done: packaging. `eng/package.sh` / `eng/package.ps1` publish the IDE self-contained per runtime and pack the CLI as a .NET tool and the SDK as NuGet packages.
+
+Remaining: unloading a removed library without a restart, a signed-package feed for libraries.
+
+Next: Phase 6. Godot 4 C# support is the last phase.
 
 ## Phase 6 — Production readiness
 

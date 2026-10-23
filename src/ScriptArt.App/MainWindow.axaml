@@ -82,6 +82,9 @@
           <MenuItem x:Name="ToggleBreakpointMenuItem" Header="Toggle _Breakpoint" InputGesture="F9" Click="OnToggleBreakpoint" />
           <MenuItem x:Name="ClearBreakpointsMenuItem" Header="Delete _All Breakpoints" Click="OnClearBreakpoints" />
         </MenuItem>
+        <MenuItem Header="_Tools">
+          <MenuItem Header="_Node Libraries…" Click="OnShowNodeLibraries" />
+        </MenuItem>
       </Menu>
 
       <Border DockPanel.Dock="Top" Background="{StaticResource IdePanelHeaderBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,1" Padding="6,3">
@@ -279,6 +282,31 @@
                              FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
           </Grid>
         </DockPanel>
+      </Border>
+    </Border>
+
+    <!-- Node libraries the user approved; adding one asks for explicit trust first. -->
+    <Border x:Name="NodeLibrariesPanel" IsVisible="False" Background="#99000000">
+      <Border Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+              CornerRadius="8" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" Width="620">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Node Libraries" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Classes="secondary" TextWrapping="Wrap"
+                     Text="A node library is a .dll that adds nodes to the palette. It runs inside ScriptArt Code with your permissions, so add only libraries from sources you trust. Libraries are approved for you, not for a project: opening a project never loads one. A library that changes after you approve it is not loaded until you approve it again." />
+          <ListBox x:Name="NodeLibraryList" Classes="problems" Background="Transparent" MaxHeight="220" />
+          <StackPanel x:Name="TrustPrompt" IsVisible="False" Spacing="8">
+            <TextBlock x:Name="TrustText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#E8B44C" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+              <Button Content="Trust and Load" Click="OnTrustNodeLibrary" />
+              <Button Content="Cancel" Click="OnCancelTrust" />
+            </StackPanel>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button x:Name="AddNodeLibraryButton" Content="Add Library…" Click="OnAddNodeLibrary" />
+            <Button x:Name="RemoveNodeLibraryButton" Content="Remove" Click="OnRemoveNodeLibrary" />
+            <Button Content="Close" Click="OnCloseNodeLibraries" />
+          </StackPanel>
+        </StackPanel>
       </Border>
     </Border>
 

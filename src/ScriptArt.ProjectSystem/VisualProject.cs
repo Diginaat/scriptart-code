@@ -49,11 +49,42 @@ public sealed class VisualProject
     // Graph files of removed or renamed graphs, deleted by the next Save once the project file no longer lists them.
     private readonly HashSet<string> obsoleteFiles = new(StringComparer.OrdinalIgnoreCase);
 
-    private VisualProject(string projectFilePath, ProjectDocument document, List<ProjectGraph> graphs)
+    // Shared with the project's snapshots, so compiling a snapshot reuses the results of unchanged graphs (D-039).
+    private readonly GraphCompilationCache compilationCache;
+
+    private VisualProject(string projectFilePath, ProjectDocument document, List<ProjectGraph> graphs, GraphCompilationCache? compilationCache = null, bool isSnapshot = false)
     {
         ProjectFilePath = Path.GetFullPath(projectFilePath);
         Document = document;
         this.graphs = graphs;
+        this.compilationCache = compilationCache ?? new GraphCompilationCache();
+        IsSnapshot = isSnapshot;
+    }
+
+    /// <summary>True for a copy made by <see cref="Snapshot"/>, whose graphs are not saved or changed.</summary>
+    public bool IsSnapshot { get; }
+
+    /// <summary>The cache that makes compiling this project incremental.</summary>
+    public GraphCompilationCache CompilationCache => compilationCache;
+
+    /// <summary>
+    /// A read-only copy of this project with copied graphs, for compiling, verifying, and generating on a background thread while
+    /// the graphs are edited. <paramref name="copy"/> copies one graph; the default is <see cref="GraphDocument.Clone"/>. A copy
+    /// must not be changed afterwards. Generating from a snapshot writes generated files as usual; it cannot save graphs.
+    /// </summary>
+    public VisualProject Snapshot(Func<GraphDocument, GraphDocument>? copy = null)
+    {
+        copy ??= graph => graph.Clone();
+        var document = new ProjectDocument { Name = Document.Name, RootNamespace = Document.RootNamespace, Graphs = [.. Document.Graphs] };
+        return new VisualProject(ProjectFilePath, document, [.. graphs.Select(graph => graph with { Graph = copy(graph.Graph) })], compilationCache, isSnapshot: true);
+    }
+
+    private void ThrowIfSnapshot()
+    {
+        if (IsSnapshot)
+        {
+            throw new InvalidOperationException("A project snapshot is read-only.");
+        }
     }
 
     public string ProjectFilePath { get; }
@@ -89,6 +120,7 @@ public sealed class VisualProject
     /// </summary>
     public ProjectGraph AddFunction(string name)
     {
+        ThrowIfSnapshot();
         GraphDocument function = GraphDocument.CreateEmpty(name, GraphKind.Function);
         function.Nodes.Add(new GraphNode { Id = GraphDocument.NewId(), Type = FunctionNodes.EntryTypeId, X = 0, Y = 0 });
         return AddGraph(function);
@@ -108,6 +140,7 @@ public sealed class VisualProject
 
     private ProjectGraph AddMember(GraphDocument owner, string name, GraphKind kind)
     {
+        ThrowIfSnapshot();
         ArgumentNullException.ThrowIfNull(owner);
         if (!graphs.Exists(graph => graph.Graph == owner) || owner.Kind is not (GraphKind.Class or GraphKind.Struct))
         {
@@ -126,6 +159,7 @@ public sealed class VisualProject
     /// </summary>
     public ProjectGraph AddType(string name, GraphKind kind)
     {
+        ThrowIfSnapshot();
         if (kind is not (GraphKind.Class or GraphKind.Struct))
         {
             throw new ArgumentException($"{kind} is not a class or struct.", nameof(kind));
@@ -151,6 +185,7 @@ public sealed class VisualProject
     /// </summary>
     public IReadOnlyList<ProjectGraph> RemoveGraph(GraphDocument graph)
     {
+        ThrowIfSnapshot();
         ArgumentNullException.ThrowIfNull(graph);
         if (graph.Kind == GraphKind.EntryPoint)
         {
@@ -248,6 +283,7 @@ public sealed class VisualProject
     /// </summary>
     public void Save()
     {
+        ThrowIfSnapshot();
         for (int index = 0; index < graphs.Count; index++)
         {
             ProjectGraph graph = graphs[index];
@@ -307,12 +343,10 @@ public sealed class VisualProject
     public (List<GraphDiagnostic> Diagnostics, List<GeneratedSource> Sources) CompileGraphs(GraphCompiler compiler)
     {
         ArgumentNullException.ThrowIfNull(compiler);
-        GraphCompilationOptions options = CompilationOptions;
         List<GraphDiagnostic> diagnostics = [];
         List<GeneratedSource> sources = [];
-        foreach (ProjectGraph graph in graphs)
+        foreach (GraphCompilationResult result in compilationCache.CompileAll(compiler, [.. graphs.Select(graph => (graph.Graph, graph.RelativePath))], CompilationOptions, immutableGraphs: IsSnapshot))
         {
-            GraphCompilationResult result = compiler.Compile(graph.Graph, options, graph.RelativePath);
             diagnostics.AddRange(result.Diagnostics);
             if (result.Source is not null)
             {
@@ -507,7 +541,7 @@ public sealed class VisualProject
     }
 
     /// <summary>Resolves a project-relative path and rejects paths that escape the project directory.</summary>
-    private static string ResolveInside(string directory, string relativePath)
+    internal static string ResolveInside(string directory, string relativePath)
     {
         string root = Path.GetFullPath(directory) + Path.DirectorySeparatorChar;
         string full = Path.GetFullPath(Path.Combine(directory, relativePath));

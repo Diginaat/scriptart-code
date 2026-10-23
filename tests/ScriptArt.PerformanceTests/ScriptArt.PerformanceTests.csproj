@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Coarse, reproducible timings for compiler and serialization on large graphs. Run in Release: dotnet run -c Release. -->
+  <!-- Coarse, reproducible timings for the compiler, serialization, and the canvas index on large graphs, and a regression check against a baseline. Run in Release: dotnet run -c Release. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ScriptArt.Compiler\ScriptArt.Compiler.csproj" />
+    <ProjectReference Include="..\..\src\ScriptArt.NodeEditor\ScriptArt.NodeEditor.csproj" />
   </ItemGroup>
 </Project>

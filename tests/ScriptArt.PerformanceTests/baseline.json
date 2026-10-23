@@ -1,0 +1,17 @@
+{
+  "serialize 1001 nodes": 0.7509,
+  "deserialize 1001 nodes": 3.4094,
+  "compile\u002Bemit 1001 nodes": 3.0332,
+  "clone 1001 nodes": 0.2435,
+  "allocated per compile 1001 nodes": 2.7858505249023438,
+  "serialize 10001 nodes": 16.3978,
+  "deserialize 10001 nodes": 53.5079,
+  "compile\u002Bemit 10001 nodes": 61.3847,
+  "clone 10001 nodes": 0.8838,
+  "allocated per compile 10001 nodes": 28.10400390625,
+  "project 20x1001 nodes, cold": 94.804,
+  "project 20x1001 nodes, one graph changed": 15.9184,
+  "project 20x1001 nodes, one graph changed, snapshot": 3.5489,
+  "spatial index build 10001 nodes": 1.5336,
+  "spatial query 1600x900 view": 0.0059
+}

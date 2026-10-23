@@ -5,12 +5,6 @@ using ScriptArt.GraphModel;
 
 namespace ScriptArt.Compiler.Lowering;
 
-/// <summary>A graph node paired with its definition.</summary>
-public sealed record ResolvedNode(GraphNode Node, NodeDefinition Definition)
-{
-    public string Id => Node.Id;
-}
-
 /// <summary>
 /// A structurally validated, indexed view of a graph. Only valid nodes and connections are indexed,
 /// so later passes never see dangling references or ill-typed links.
