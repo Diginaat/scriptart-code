@@ -2,6 +2,7 @@ using ScriptArt.Compiler;
 using ScriptArt.Compiler.Diagnostics;
 using ScriptArt.Compiler.Emit;
 using ScriptArt.Compiler.Nodes;
+using ScriptArt.Compiler.TypeSystem;
 using ScriptArt.GraphModel;
 
 namespace ScriptArt.ProjectSystem;
@@ -64,6 +65,32 @@ public sealed class VisualProject
     /// <summary>True for a copy made by <see cref="Snapshot"/>, whose graphs are not saved or changed.</summary>
     public bool IsSnapshot { get; }
 
+    /// <summary>
+    /// The source generators the user approved (<see cref="Preferences.ApprovedSourceGenerators"/>). Those of the project's packages
+    /// run when its code is verified; others are never loaded (D-050).
+    /// </summary>
+    public IReadOnlyList<SourceGeneratorAssembly> ApprovedSourceGenerators { get; set; } = [];
+
+    /// <summary>The project's source generators that the user has not approved, so verification does not run them.</summary>
+    public IReadOnlyList<string> UnapprovedSourceGenerators() =>
+        [.. References.SourceGeneratorPaths.Where(path => !ApprovedSourceGenerators.Any(approved => PreferencesStore.SamePath(approved.Path, path)))];
+
+    // The approved generators of the project's packages, with the properties Godot.NET.Sdk makes visible to them.
+    private SourceGeneratorSet? SourceGenerators()
+    {
+        SourceGeneratorAssembly[] approved = [.. ApprovedSourceGenerators.Where(approved =>
+            References.SourceGeneratorPaths.Any(path => PreferencesStore.SamePath(approved.Path, path)))];
+        if (approved.Length == 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, string> properties = IsGodotProject
+            ? new() { ["GodotProjectDir"] = DirectoryPath + Path.DirectorySeparatorChar, ["GodotSourceGenerators"] = "", ["IsGodotToolsProject"] = "false" }
+            : [];
+        return new SourceGeneratorSet(approved, properties);
+    }
+
     /// <summary>The cache that makes compiling this project incremental.</summary>
     public GraphCompilationCache CompilationCache => compilationCache;
 
@@ -76,7 +103,10 @@ public sealed class VisualProject
     {
         copy ??= graph => graph.Clone();
         var document = new ProjectDocument { Name = Document.Name, RootNamespace = Document.RootNamespace, Graphs = [.. Document.Graphs] };
-        return new VisualProject(ProjectFilePath, document, [.. graphs.Select(graph => graph with { Graph = copy(graph.Graph) })], compilationCache, isSnapshot: true);
+        return new VisualProject(ProjectFilePath, document, [.. graphs.Select(graph => graph with { Graph = copy(graph.Graph) })], compilationCache, isSnapshot: true)
+        {
+            ApprovedSourceGenerators = ApprovedSourceGenerators,
+        };
     }
 
     private void ThrowIfSnapshot()
@@ -131,6 +161,25 @@ public sealed class VisualProject
     /// as <c>Graphs/{owner}.{name}.graph.json</c>.
     /// </summary>
     public ProjectGraph AddMethod(GraphDocument owner, string name) => AddMember(owner, name, GraphKind.Function);
+
+    /// <summary>
+    /// Adds a method to the class graph <paramref name="owner"/> that overrides <paramref name="overridden"/>, with its parameters and
+    /// return type (D-047). A parameter named with a C# keyword, such as Godot's <c>@event</c>, is renamed (<c>theEvent</c>), since
+    /// graph names are plain identifiers; an override may name its parameters freely.
+    /// </summary>
+    public ProjectGraph AddOverride(GraphDocument owner, ExternalMethod overridden)
+    {
+        ArgumentNullException.ThrowIfNull(overridden);
+        ProjectGraph method = AddMethod(owner, overridden.Name);
+        method.Graph.Parameters.AddRange(overridden.Parameters.Select(parameter => new GraphParameter
+        {
+            Id = GraphDocument.NewId(),
+            Name = GraphCompiler.IsValidIdentifier(parameter.Name) ? parameter.Name : "the" + char.ToUpperInvariant(parameter.Name[0]) + parameter.Name[1..],
+            Type = parameter.Type.SourceName,
+        }));
+        method.Graph.ReturnType = overridden.ReturnType == TypeRef.Void ? null : overridden.ReturnType.SourceName;
+        return method;
+    }
 
     /// <summary>
     /// Adds a constructor of the class or struct graph <paramref name="owner"/>, like <see cref="AddMethod"/>. Its
@@ -230,6 +279,90 @@ public sealed class VisualProject
     /// </summary>
     public static VisualProject Create(string directory, string name)
     {
+        (string projectFile, string csproj) = NewProjectFiles(directory, name);
+        var document = new ProjectDocument { Name = name, RootNamespace = name };
+        string graphPath = $"{GraphsFolder}/Program{GraphSerializer.FileExtension}";
+        document.Graphs.Add(graphPath);
+
+        var project = new VisualProject(projectFile, document, [new ProjectGraph(graphPath, CreateStarterGraph())]);
+        Directory.CreateDirectory(directory);
+        AtomicFile.WriteAllText(csproj, CsprojTemplate(document));
+        project.Save();
+        return project;
+    }
+
+    /// <summary>The Godot version new Godot projects target: the oldest supported Godot 4 release (D-047).</summary>
+    public const string GodotVersion = "4.4.1";
+
+    /// <summary>
+    /// Creates a Godot 4 C# project (D-047): a <c>Godot.NET.Sdk</c> <c>.csproj</c>, a <c>project.godot</c> and a <c>Main.tscn</c>
+    /// scene unless the folder already has them, and a <c>Main</c> class deriving from <c>Godot.Node</c> whose <c>_Ready</c> prints a
+    /// greeting. The scene runs the script generated from <c>Main</c>.
+    /// </summary>
+    public static VisualProject CreateGodot(string directory, string name)
+    {
+        (string projectFile, string csproj) = NewProjectFiles(directory, name);
+        GraphDocument main = GraphDocument.CreateEmpty("Main", GraphKind.Class);
+        main.BaseType = "Godot.Node";
+        GraphDocument ready = GraphDocument.CreateEmpty("_Ready", GraphKind.Function);
+        ready.Owner = main.Id;
+        var entry = new GraphNode { Id = GraphDocument.NewId(), Type = FunctionNodes.EntryTypeId, X = 0, Y = 0 };
+        var print = new GraphNode { Id = GraphDocument.NewId(), Type = "dotnet:M:Godot.GD.Print(System.String)", X = 260, Y = 0 };
+        var text = new GraphNode { Id = GraphDocument.NewId(), Type = "literal.string", X = 0, Y = 120 };
+        text.Properties["value"] = "Hello from ScriptArt Code!";
+        ready.Nodes.AddRange([entry, print, text]);
+        ready.Connections.Add(new GraphConnection(new PinRef(entry.Id, "then"), new PinRef(print.Id, "exec")));
+        ready.Connections.Add(new GraphConnection(new PinRef(text.Id, "value"), new PinRef(print.Id, "what")));
+
+        var document = new ProjectDocument { Name = name, RootNamespace = name };
+        List<ProjectGraph> graphs = [
+            new($"{GraphsFolder}/Main{GraphSerializer.FileExtension}", main),
+            new($"{GraphsFolder}/Main._Ready{GraphSerializer.FileExtension}", ready)];
+        document.Graphs.AddRange(graphs.Select(graph => graph.RelativePath));
+
+        var project = new VisualProject(projectFile, document, graphs);
+        Directory.CreateDirectory(directory);
+        AtomicFile.WriteAllText(csproj, GodotCsprojTemplate(document));
+        WriteIfMissing(Path.Combine(directory, "project.godot"), $"""
+            ; Godot project settings, created by ScriptArt Code. Godot keeps this file up to date.
+
+            config_version=5
+
+            [application]
+
+            config/name="{name}"
+            run/main_scene="res://Main.tscn"
+            config/features=PackedStringArray("{GodotVersion[..3]}", "C#")
+
+            [dotnet]
+
+            project/assembly_name="{name}"
+
+            """);
+        WriteIfMissing(Path.Combine(directory, "Main.tscn"), $"""
+            [gd_scene load_steps=2 format=3]
+
+            [ext_resource type="Script" path="res://{GeneratedFolder}/Main.cs" id="1"]
+
+            [node name="Main" type="Node"]
+            script = ExtResource("1")
+
+            """);
+        project.Save();
+        return project;
+
+        static void WriteIfMissing(string path, string text)
+        {
+            if (!File.Exists(path))
+            {
+                AtomicFile.WriteAllText(path, text.ReplaceLineEndings("\n"));
+            }
+        }
+    }
+
+    // The project and .csproj files of a new project, after checking the name and that neither exists.
+    private static (string ProjectFile, string Csproj) NewProjectFiles(string directory, string name)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         if (!GraphCompiler.IsValidNamespace(name))
         {
@@ -246,15 +379,26 @@ public sealed class VisualProject
             }
         }
 
-        var document = new ProjectDocument { Name = name, RootNamespace = name };
-        string graphPath = $"{GraphsFolder}/Program{GraphSerializer.FileExtension}";
-        document.Graphs.Add(graphPath);
+        return (projectFile, csproj);
+    }
 
-        var project = new VisualProject(projectFile, document, [new ProjectGraph(graphPath, CreateStarterGraph())]);
-        Directory.CreateDirectory(directory);
-        AtomicFile.WriteAllText(csproj, CsprojTemplate(document));
-        project.Save();
-        return project;
+    /// <summary>
+    /// True when the <c>.csproj</c> uses <c>Godot.NET.Sdk</c>: a Godot 4 C# project, built as a library that the Godot editor loads,
+    /// with no <c>Main</c> method.
+    /// </summary>
+    public bool IsGodotProject
+    {
+        get
+        {
+            try
+            {
+                return System.Xml.Linq.XDocument.Load(CsprojPath).Root?.Attribute("Sdk")?.Value.StartsWith("Godot.NET.Sdk", StringComparison.OrdinalIgnoreCase) == true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+            {
+                return false;
+            }
+        }
     }
 
     public static VisualProject Load(string projectFilePath)
@@ -274,6 +418,24 @@ public sealed class VisualProject
         List<ProjectGraph> graphs = [.. document.Graphs.Select(relative =>
             new ProjectGraph(relative, GraphSerializer.Load(ResolveInside(directory, relative))))];
         return new VisualProject(projectFilePath, document, graphs);
+    }
+
+    /// <summary>
+    /// The text <see cref="Save"/> would write for the project file and each graph, by full path, without writing anything. Autosave
+    /// keeps these as recovery copies.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> SerializedFiles()
+    {
+        Dictionary<string, string> files = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [ProjectFilePath] = ProjectSerializer.Serialize(Document),
+        };
+        foreach (ProjectGraph graph in graphs)
+        {
+            files[ResolveInside(DirectoryPath, graph.RelativePath)] = GraphSerializer.Serialize(graph.Graph);
+        }
+
+        return files;
     }
 
     /// <summary>
@@ -370,7 +532,7 @@ public sealed class VisualProject
             return new ProjectGenerationResult(diagnostics, sources, [], []);
         }
 
-        diagnostics.AddRange(RoslynVerifier.Verify(Document.Name, VerificationSources(sources, unsavedFiles), isExecutable: true, References.AssemblyPaths));
+        diagnostics.AddRange(RoslynVerifier.Verify(Document.Name, VerificationSources(sources, unsavedFiles), isExecutable: !IsGodotProject, References.AssemblyPaths, SourceGenerators()));
         if (diagnostics.Any(diagnostic => diagnostic.IsError))
         {
             return new ProjectGenerationResult(diagnostics, sources, [], []);
@@ -520,6 +682,25 @@ public sealed class VisualProject
                 <RootNamespace>{document.RootNamespace}</RootNamespace>
                 <Nullable>enable</Nullable>
                 <ImplicitUsings>disable</ImplicitUsings>
+              </PropertyGroup>
+
+            </Project>
+
+            """.ReplaceLineEndings("\n");
+    }
+
+    /// <summary>The <c>.csproj</c> of a new Godot project: <c>Godot.NET.Sdk</c> at <see cref="GodotVersion"/>, which brings GodotSharp.</summary>
+    public static string GodotCsprojTemplate(ProjectDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return $"""
+            <Project Sdk="Godot.NET.Sdk/{GodotVersion}">
+
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+                <EnableDynamicLoading>true</EnableDynamicLoading>
+                <RootNamespace>{document.RootNamespace}</RootNamespace>
+                <Nullable>enable</Nullable>
               </PropertyGroup>
 
             </Project>

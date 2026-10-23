@@ -1,0 +1,13 @@
+; Godot project settings, created by ScriptArt Code. Godot keeps this file up to date.
+
+config_version=5
+
+[application]
+
+config/name="GodotMover"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.4", "C#")
+
+[dotnet]
+
+project/assembly_name="GodotMover"

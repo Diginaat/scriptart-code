@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace ScriptArt.ProjectSystem;
 
@@ -120,6 +121,106 @@ public static partial class ProjectSolution
         return DotNetCli.RunAsync(["remove", project.CsprojPath, "reference", Path.GetFullPath(csprojPath)], output, cancellationToken);
     }
 
+    /// <summary>The project templates <see cref="NewProjectAsync"/> offers, by <c>dotnet new</c> short name.</summary>
+    public static readonly IReadOnlyList<(string ShortName, string Description)> Templates =
+    [
+        ("classlib", "Class library"),
+        ("console", "Console application"),
+        ("xunit", "xUnit test project"),
+    ];
+
+    /// <summary>
+    /// The full paths of the projects in a <c>.slnx</c> or <c>.sln</c> file, in file order. Solution folders are left out. A
+    /// missing or unreadable solution has none.
+    /// </summary>
+    public static IReadOnlyList<string> ProjectsIn(string solutionPath)
+    {
+        ArgumentNullException.ThrowIfNull(solutionPath);
+        string directory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
+        IEnumerable<string> relative;
+        try
+        {
+            relative = string.Equals(Path.GetExtension(solutionPath), ".slnx", StringComparison.OrdinalIgnoreCase)
+                ? [.. XDocument.Load(solutionPath).Descendants()
+                    .Where(element => element.Name.LocalName == "Project")
+                    .Select(element => element.Attribute("Path")?.Value)
+                    .OfType<string>()]
+                : [.. File.ReadLines(solutionPath)
+                    .Select(line => SlnProjectPattern().Match(line))
+                    .Where(match => match.Success)
+                    .Select(match => match.Groups["path"].Value)
+                    .Where(path => path.EndsWith("proj", StringComparison.OrdinalIgnoreCase))];
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+        {
+            return [];
+        }
+
+        return [.. relative.Select(path => Path.GetFullPath(Path.Combine(directory, path.Replace('\\', Path.DirectorySeparatorChar))))];
+    }
+
+    /// <summary>Adds an existing project to the solution.</summary>
+    public static Task<int> AddToSolutionAsync(string solutionPath, string csprojPath, Action<string> output, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(solutionPath);
+        string project = Path.GetFullPath(csprojPath);
+        if (!project.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) || !File.Exists(project))
+        {
+            throw new ArgumentException($"'{csprojPath}' is not a C# project file.", nameof(csprojPath));
+        }
+
+        return DotNetCli.RunAsync(["sln", solutionPath, "add", project], output, cancellationToken);
+    }
+
+    /// <summary>Removes a project from the solution. Its files stay on disk.</summary>
+    public static Task<int> RemoveFromSolutionAsync(string solutionPath, string csprojPath, Action<string> output, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(solutionPath);
+        return DotNetCli.RunAsync(["sln", solutionPath, "remove", Path.GetFullPath(csprojPath)], output, cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates a project from the <c>dotnet new</c> template <paramref name="template"/> in a folder named <paramref name="name"/>
+    /// next to the project folder (inside it, the project would compile its files too), adds it to the solution, and, when
+    /// <paramref name="reference"/> is true, references it from the project so its public methods become nodes after a build.
+    /// Returns the exit code of the first command that failed, or 0.
+    /// </summary>
+    public static async Task<int> NewProjectAsync(VisualProject project, string solutionPath, string template, string name, bool reference,
+        Action<string> output, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(project);
+        ArgumentNullException.ThrowIfNull(solutionPath);
+        if (!Templates.Any(candidate => candidate.ShortName == template))
+        {
+            throw new ArgumentException($"'{template}' is not one of the offered templates.", nameof(template));
+        }
+
+        if (!IsValidProjectName(name))
+        {
+            throw new ArgumentException($"'{name}' is not a valid project name. Use letters, digits, dots, and underscores, starting with a letter.", nameof(name));
+        }
+
+        string directory = Path.Combine(Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(project.DirectoryPath))!, name);
+        if (Directory.Exists(directory) || File.Exists(directory))
+        {
+            throw new IOException($"'{directory}' already exists. Choose a different name.");
+        }
+
+        string csproj = Path.Combine(directory, name + ".csproj");
+        int exitCode = await DotNetCli.RunAsync(["new", template, "--name", name, "--output", directory], output, cancellationToken).ConfigureAwait(false);
+        if (exitCode == 0)
+        {
+            exitCode = await DotNetCli.RunAsync(["sln", solutionPath, "add", csproj], output, cancellationToken).ConfigureAwait(false);
+        }
+
+        return exitCode != 0 || !reference
+            ? exitCode
+            : await DotNetCli.RunAsync(["add", project.CsprojPath, "reference", csproj], output, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>True for a project name: letters, digits, '.', and '_', starting with a letter.</summary>
+    public static bool IsValidProjectName(string? name) => name is { Length: > 0 and <= 100 } && ProjectNamePattern().IsMatch(name);
+
     /// <summary>True for a NuGet package id: letters, digits, '.', '-', and '_', starting with a letter, digit, or '_'.</summary>
     public static bool IsValidPackageId(string? packageId) => packageId is { Length: > 0 and <= 100 } && PackageIdPattern().IsMatch(packageId);
 
@@ -131,4 +232,11 @@ public static partial class ProjectSolution
 
     [GeneratedRegex(@"^[0-9*][0-9A-Za-z.+\-*]*$")]
     private static partial Regex VersionPattern();
+
+    [GeneratedRegex(@"^[A-Za-z][A-Za-z0-9_.]*$")]
+    private static partial Regex ProjectNamePattern();
+
+    // Project("{type}") = "Name", "relative\path.csproj", "{guid}"
+    [GeneratedRegex(@"^Project\(""\{[^}]+\}""\)\s*=\s*""[^""]*""\s*,\s*""(?<path>[^""]+)""")]
+    private static partial Regex SlnProjectPattern();
 }

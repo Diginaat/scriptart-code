@@ -2,6 +2,7 @@ using AvaloniaEdit.Document;
 using ScriptArt.Compiler;
 using ScriptArt.Compiler.Emit;
 using ScriptArt.Compiler.Nodes;
+using ScriptArt.Compiler.TypeSystem;
 using ScriptArt.GraphModel;
 using ScriptArt.NodeEditor;
 using ScriptArt.ProjectSystem;
@@ -11,14 +12,14 @@ namespace ScriptArt.App;
 
 /// <summary>
 /// The open project and the graph being edited. Each graph keeps its own editor, so undo history survives switching graphs.
-/// The entry graph is opened on load. Handwritten C# files opened in the code view keep their text, and its undo history, until
-/// saved with the project; node breakpoints last for the session.
+/// The entry graph is opened on load. Files opened in the editor (handwritten C#, the <c>.csproj</c>, and other text files) keep
+/// their text, and its undo history, until saved with the project or closed; node breakpoints last for the session.
 /// </summary>
 internal sealed class Workspace
 {
     private readonly Dictionary<GraphDocument, GraphEditor> editors = [];
 
-    // Handwritten files opened in the code view, by full path, with the text last saved.
+    // Files opened in the editor, by full path, with the text last saved.
     private readonly Dictionary<string, (TextDocument Document, string SavedText)> codeFiles = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly HashSet<NodeBreakpoint> breakpoints = [];
@@ -106,7 +107,7 @@ internal sealed class Workspace
         breakpoints.RemoveWhere(breakpoint => !Project.Graphs.Any(graph => graph.Graph.Id == breakpoint.GraphId && graph.Graph.FindNode(breakpoint.NodeId) is not null));
     }
 
-    /// <summary>The document of a handwritten file, read from disk the first time it is opened.</summary>
+    /// <summary>The document of a file in the editor, read from disk the first time it is opened.</summary>
     public TextDocument OpenCodeFile(string path)
     {
         string fullPath = Path.GetFullPath(path);
@@ -121,8 +122,78 @@ internal sealed class Workspace
         return file.Document;
     }
 
-    /// <summary>True when the open handwritten file <paramref name="path"/> has changes that are not saved.</summary>
+    /// <summary>True when the open file <paramref name="path"/> has changes that are not saved.</summary>
     public bool IsCodeFileDirty(string path) => codeFiles.TryGetValue(Path.GetFullPath(path), out (TextDocument Document, string SavedText) file) && file.Document.Text != file.SavedText;
+
+    /// <summary>True when the graph's editor has changes that are not saved.</summary>
+    public bool EditorIsDirty(GraphDocument graph) => editors.TryGetValue(graph, out GraphEditor? editor) && editor.IsDirty;
+
+    /// <summary>
+    /// Re-reads an open file that changed on disk, for example edited in VS Code, unless it has unsaved changes here. Returns true
+    /// when its text was replaced.
+    /// </summary>
+    public bool ReloadFromDisk(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!codeFiles.TryGetValue(fullPath, out (TextDocument Document, string SavedText) file) || file.Document.Text != file.SavedText || !File.Exists(fullPath))
+        {
+            return false;
+        }
+
+        string text = File.ReadAllText(fullPath);
+        if (text == file.SavedText)
+        {
+            return false;
+        }
+
+        file.Document.Text = text;
+        codeFiles[fullPath] = (file.Document, text);
+        return true;
+    }
+
+    /// <summary>Saves one open file (see <see cref="ProjectFiles.SaveText"/> for what is refused).</summary>
+    public void SaveFile(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (codeFiles.TryGetValue(fullPath, out (TextDocument Document, string SavedText) file) && file.Document.Text != file.SavedText)
+        {
+            string text = file.Document.Text;
+            ProjectFiles.SaveText(Project, fullPath, text);
+            codeFiles[fullPath] = (file.Document, text);
+        }
+    }
+
+    /// <summary>Puts back the saved text of an open file, discarding its changes.</summary>
+    public void RevertFile(string path)
+    {
+        if (codeFiles.TryGetValue(Path.GetFullPath(path), out (TextDocument Document, string SavedText) file))
+        {
+            file.Document.Text = file.SavedText;
+        }
+    }
+
+    /// <summary>Forgets an open file without saving it: after it was closed, deleted, or discarded.</summary>
+    public void ForgetFile(string path) => codeFiles.Remove(Path.GetFullPath(path));
+
+    /// <summary>Follows a file, or the files of a folder, renamed on disk, keeping their unsaved text.</summary>
+    public void FileRenamed(string oldPath, string newPath)
+    {
+        string from = Path.GetFullPath(oldPath);
+        string to = Path.GetFullPath(newPath);
+        foreach (string path in codeFiles.Keys.ToArray())
+        {
+            string? renamed = string.Equals(path, from, StringComparison.OrdinalIgnoreCase) ? to
+                : path.StartsWith(from + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ? to + path[from.Length..]
+                : null;
+            if (renamed is not null)
+            {
+                (TextDocument document, string saved) = codeFiles[path];
+                codeFiles.Remove(path);
+                document.FileName = renamed;
+                codeFiles[renamed] = (document, saved);
+            }
+        }
+    }
 
     /// <summary>Node libraries' nodes that could not be added, such as nodes whose type ID another library already uses.</summary>
     public IReadOnlyList<string> LibraryProblems { get; private init; } = [];
@@ -192,6 +263,17 @@ internal sealed class Workspace
     {
         ArgumentNullException.ThrowIfNull(owner);
         return Add(Project.AddMethod(owner.Graph, UnusedName("Method")));
+    }
+
+    /// <summary>
+    /// Adds a method to the class <paramref name="owner"/> that overrides <paramref name="overridden"/>, a virtual method of its base
+    /// class: same name, parameters, and return type. Opens it.
+    /// </summary>
+    public ProjectGraph AddOverride(ProjectGraph owner, ExternalMethod overridden)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(overridden);
+        return Add(Project.AddOverride(owner.Graph, overridden));
     }
 
     /// <summary>Adds a constructor with an unused name such as <c>Constructor1</c> to the class or struct <paramref name="owner"/> and opens it.</summary>
@@ -305,10 +387,9 @@ internal sealed class Workspace
     {
         Project.Save();
         projectChanged = false;
-        foreach ((string path, string text) in UnsavedFiles)
+        foreach (string path in UnsavedFiles.Keys)
         {
-            Project.SaveSourceFile(path, text);
-            codeFiles[path] = (codeFiles[path].Document, text);
+            SaveFile(path);
         }
 
         // Saving moves renamed graphs to new files, which replaces their project entries.

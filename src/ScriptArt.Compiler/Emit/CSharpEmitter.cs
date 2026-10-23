@@ -20,13 +20,22 @@ internal static class CSharpEmitter
     public static GeneratedSource Emit(IrClass irClass, string relativePath, string sourceDescription)
     {
         var usings = new SortedSet<string>(StringComparer.Ordinal);
+
+        // A class deriving from a .NET class (a Godot script) is public so that the engine finds it; its own members stay internal
+        // because they may use the project's internal types (D-047).
+        bool derived = irClass.BaseType is not null;
+        SyntaxKind memberAccess = derived ? SyntaxKind.InternalKeyword : SyntaxKind.PublicKeyword;
         MemberDeclarationSyntax[] members = [
+            .. irClass.Signals.Select(signal => EmitSignal(signal, usings)),
             .. EmitConstructor(irClass),
-            .. irClass.Properties.Select(property => EmitProperty(property, usings)),
-            .. irClass.Methods.Select(method => EmitMethod(method, irClass.Name, usings))];
+            .. irClass.Properties.Select(property => EmitProperty(property, memberAccess, usings)),
+            .. irClass.Methods.Select(method => EmitMethod(method, irClass.Name, memberAccess, usings))];
 
         TypeDeclarationSyntax typeDeclaration = irClass.Kind switch
         {
+            IrClassKind.Class when derived => ClassDeclaration(irClass.Name)
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.PartialKeyword))
+                .AddBaseListTypes(SimpleBaseType(TypeSyntaxFor(irClass.BaseType!, usings))),
             IrClassKind.Class => ClassDeclaration(irClass.Name).AddModifiers(irClass.IsPartial
                 ? [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword), Token(SyntaxKind.PartialKeyword)]
                 : [Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword)]),
@@ -80,30 +89,48 @@ internal static class CSharpEmitter
         "// </auto-generated>" + EndOfLineText + EndOfLineText +
         "#nullable enable" + EndOfLineText + EndOfLineText);
 
+    // [Signal] public delegate void HitEventHandler(int damage); Godot's generator requires the EventHandler suffix (GD0201).
+    private static DelegateDeclarationSyntax EmitSignal(IrSignal signal, SortedSet<string> usings)
+    {
+        usings.Add("Godot");
+        return DelegateDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier(signal.Name + "EventHandler"))
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(Attribute(IdentifierName("Signal")))))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .WithParameterList(ParameterList(SeparatedList(signal.Parameters.Select(parameter =>
+                Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings))))));
+    }
+
     /// <summary>The empty parameterless constructor that <see cref="IrClass.DefaultConstructor"/> asks for.</summary>
     private static IEnumerable<MemberDeclarationSyntax> EmitConstructor(IrClass irClass) =>
         irClass.DefaultConstructor
             ? [ConstructorDeclaration(irClass.Name).AddModifiers(Token(SyntaxKind.PublicKeyword)).WithBody(Block())]
             : [];
 
-    private static PropertyDeclarationSyntax EmitProperty(IrProperty property, SortedSet<string> usings)
+    private static PropertyDeclarationSyntax EmitProperty(IrProperty property, SyntaxKind access, SortedSet<string> usings)
     {
         PropertyDeclarationSyntax syntax = PropertyDeclaration(TypeSyntaxFor(property.Type, usings), property.Name)
-            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddModifiers(Token(access))
             .AddAccessorListAccessors(
                 AccessorDeclaration(SyntaxKind.GetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
                 AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+        if (property.IsExported)
+        {
+            usings.Add("Godot");
+            syntax = syntax.AddAttributeLists(AttributeList(SingletonSeparatedList(Attribute(IdentifierName("Export")))));
+        }
+
         return property.Initializer is null
             ? syntax
             : syntax.WithInitializer(EqualsValueClause(EmitExpression(property.Initializer, usings))).WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
-    private static BaseMethodDeclarationSyntax EmitMethod(IrMethod method, string className, SortedSet<string> usings)
+    private static BaseMethodDeclarationSyntax EmitMethod(IrMethod method, string className, SyntaxKind access, SortedSet<string> usings)
     {
         ParameterSyntax[] parameters = [.. method.Parameters.Select(parameter => Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings)))];
         if (method.IsConstructor)
         {
-            return ConstructorDeclaration(className).AddModifiers(Token(SyntaxKind.PublicKeyword))
+            // Godot creates scripts through their parameterless constructor, so that one stays public.
+            return ConstructorDeclaration(className).AddModifiers(Token(parameters.Length == 0 ? SyntaxKind.PublicKeyword : access))
                 .AddParameterListParameters(parameters)
                 .WithBody(EmitBlock(method.Body, usings));
         }
@@ -112,8 +139,10 @@ internal static class CSharpEmitter
         TypeRef returnType = !method.IsAsync ? method.ReturnType
             : method.ReturnType == TypeRef.Void ? TypeRef.Task
             : TypeRef.Task with { Arguments = [method.ReturnType] };
+        // An override keeps the accessibility of the public virtual method it overrides.
         SyntaxToken[] modifiers = [
-            Token(SyntaxKind.PublicKeyword),
+            Token(method.IsOverride ? SyntaxKind.PublicKeyword : access),
+            .. method.IsOverride ? [Token(SyntaxKind.OverrideKeyword)] : Array.Empty<SyntaxToken>(),
             .. method.IsStatic ? [Token(SyntaxKind.StaticKeyword)] : Array.Empty<SyntaxToken>(),
             .. method.IsAsync ? [Token(SyntaxKind.AsyncKeyword)] : Array.Empty<SyntaxToken>()];
         return MethodDeclaration(TypeSyntaxFor(returnType, usings), method.Name)
@@ -148,6 +177,9 @@ internal static class CSharpEmitter
             IrForEach loop => ForEachStatement(TypeSyntaxFor(loop.Item.Type, usings), loop.Item.Name, EmitExpression(loop.Collection, usings), EmitBlock(loop.Body, usings)),
             IrElementAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                 EmitElementAccess(assignment.Receiver, assignment.Index, usings), EmitExpression(assignment.Value, usings))),
+            IrEventSubscription subscription => ExpressionStatement(AssignmentExpression(SyntaxKind.AddAssignmentExpression,
+                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(subscription.Receiver, Precedence.Primary, usings), IdentifierName(subscription.EventName)),
+                EmitExpression(subscription.Handler, usings))),
             IrMemberAssignment assignment => ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                 MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, Operand(assignment.Receiver, Precedence.Primary, usings), IdentifierName(assignment.MemberName)),
                 EmitExpression(assignment.Value, usings))),
@@ -228,6 +260,13 @@ internal static class CSharpEmitter
             [AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(copy.MemberName), EmitExpression(copy.Value, usings))])),
         IrDefault => PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.DefaultLiteralExpression)),
         IrAwait wait => AwaitExpression(Operand(wait.Operand, Precedence.Unary, usings)),
+        IrLambda lambda => ParenthesizedLambdaExpression(
+            ParameterList(SeparatedList(lambda.Parameters.Select(parameter => lambda.TypedParameters
+                ? Parameter(Identifier(parameter.Name)).WithType(TypeSyntaxFor(parameter.Type, usings))
+                : Parameter(Identifier(parameter.Name))))),
+            EmitBlock(lambda.Body, usings)),
+        IrTypeTest test => IsPatternExpression(Operand(test.Operand, Precedence.Additive, usings),
+            DeclarationPattern(TypeSyntaxFor(test.Tested, usings), SingleVariableDesignation(Identifier(test.Local.Name)))),
         IrError => throw new InvalidOperationException("IR containing errors must not be emitted."),
         _ => throw new NotSupportedException($"Unsupported IR expression {expression.GetType().Name}."),
     };
@@ -298,6 +337,7 @@ internal static class CSharpEmitter
         IrBinary { Operator: IrBinaryOperator.LogicalOr } => Precedence.LogicalOr,
         IrBinary { Operator: IrBinaryOperator.Coalesce } => Precedence.Coalesce,
         IrWith => Precedence.With,
+        IrTypeTest => Precedence.Relational,
         IrUnary or IrConvert or IrAwait => Precedence.Unary,
         IrLiteral { Value: int and < 0 } or IrLiteral { Value: double and < 0 } => Precedence.Unary,
         _ => Precedence.Primary,
@@ -338,6 +378,7 @@ internal static class CSharpEmitter
             case "bool": return PredefinedType(Token(SyntaxKind.BoolKeyword));
             case "int": return PredefinedType(Token(SyntaxKind.IntKeyword));
             case "double": return PredefinedType(Token(SyntaxKind.DoubleKeyword));
+            case "float": return PredefinedType(Token(SyntaxKind.FloatKeyword));
             case "string": return PredefinedType(Token(SyntaxKind.StringKeyword));
         }
 

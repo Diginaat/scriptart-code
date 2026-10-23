@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 9,
+  "id": "player-physics",
+  "name": "_PhysicsProcess",
+  "kind": "Function",
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "function.entry",
+      "x": 0,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "left",
+      "type": "literal.string",
+      "x": 0,
+      "y": 200,
+      "properties": {
+        "value": "ui_left"
+      }
+    },
+    {
+      "id": "right",
+      "type": "literal.string",
+      "x": 0,
+      "y": 300,
+      "properties": {
+        "value": "ui_right"
+      }
+    },
+    {
+      "id": "axis",
+      "type": "dotnet:M:Godot.Input.GetAxis(Godot.StringName,Godot.StringName)",
+      "x": 260,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "self",
+      "type": "type.self",
+      "x": 260,
+      "y": 420,
+      "properties": {}
+    },
+    {
+      "id": "speed",
+      "type": "type.get-property",
+      "x": 520,
+      "y": 300,
+      "properties": {
+        "type": "player",
+        "property": "speed"
+      }
+    },
+    {
+      "id": "times",
+      "type": "math.double.multiply",
+      "x": 760,
+      "y": 200,
+      "properties": {}
+    },
+    {
+      "id": "velocity",
+      "type": "dotnet:P:Godot.CharacterBody2D.Velocity",
+      "x": 520,
+      "y": 460,
+      "properties": {}
+    },
+    {
+      "id": "y",
+      "type": "dotnet:F:Godot.Vector2.Y",
+      "x": 760,
+      "y": 460,
+      "properties": {}
+    },
+    {
+      "id": "vector",
+      "type": "dotnet:M:Godot.Vector2.#ctor(System.Single,System.Single)",
+      "x": 1000,
+      "y": 260,
+      "properties": {}
+    },
+    {
+      "id": "set",
+      "type": "dotnet:set:P:Godot.CharacterBody2D.Velocity",
+      "x": 1240,
+      "y": 0,
+      "properties": {}
+    },
+    {
+      "id": "move",
+      "type": "dotnet:M:Godot.CharacterBody2D.MoveAndSlide",
+      "x": 1500,
+      "y": 0,
+      "properties": {}
+    }
+  ],
+  "connections": [
+    {
+      "from": {
+        "node": "entry",
+        "pin": "then"
+      },
+      "to": {
+        "node": "axis",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "axis",
+        "pin": "then"
+      },
+      "to": {
+        "node": "set",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "set",
+        "pin": "then"
+      },
+      "to": {
+        "node": "move",
+        "pin": "exec"
+      }
+    },
+    {
+      "from": {
+        "node": "left",
+        "pin": "value"
+      },
+      "to": {
+        "node": "axis",
+        "pin": "negativeAction"
+      }
+    },
+    {
+      "from": {
+        "node": "right",
+        "pin": "value"
+      },
+      "to": {
+        "node": "axis",
+        "pin": "positiveAction"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "speed",
+        "pin": "object"
+      }
+    },
+    {
+      "from": {
+        "node": "axis",
+        "pin": "result"
+      },
+      "to": {
+        "node": "times",
+        "pin": "a"
+      }
+    },
+    {
+      "from": {
+        "node": "speed",
+        "pin": "value"
+      },
+      "to": {
+        "node": "times",
+        "pin": "b"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "velocity",
+        "pin": "instance"
+      }
+    },
+    {
+      "from": {
+        "node": "velocity",
+        "pin": "result"
+      },
+      "to": {
+        "node": "y",
+        "pin": "instance"
+      }
+    },
+    {
+      "from": {
+        "node": "times",
+        "pin": "result"
+      },
+      "to": {
+        "node": "vector",
+        "pin": "x"
+      }
+    },
+    {
+      "from": {
+        "node": "y",
+        "pin": "result"
+      },
+      "to": {
+        "node": "vector",
+        "pin": "y"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "set",
+        "pin": "instance"
+      }
+    },
+    {
+      "from": {
+        "node": "vector",
+        "pin": "result"
+      },
+      "to": {
+        "node": "set",
+        "pin": "value"
+      }
+    },
+    {
+      "from": {
+        "node": "self",
+        "pin": "self"
+      },
+      "to": {
+        "node": "move",
+        "pin": "instance"
+      }
+    }
+  ],
+  "comments": [
+    {
+      "id": "about",
+      "x": -40,
+      "y": -80,
+      "width": 1760,
+      "height": 640,
+      "text": "Every physics frame: move left and right with the arrow keys at Speed pixels per second, keeping the vertical speed."
+    }
+  ],
+  "variables": [],
+  "parameters": [
+    {
+      "id": "delta",
+      "name": "delta",
+      "type": "double"
+    }
+  ],
+  "properties": [],
+  "typeParameters": [],
+  "owner": "player"
+}

@@ -7,7 +7,8 @@
 - The compiler must never emit code for a graph that has errors.
 - Node type IDs (`core.entry`, `console.write-line`, …) and pin IDs are part of the file format. Do not rename them; add new nodes instead.
 - Graph or project schema changes: bump `CurrentSchemaVersion`, add a migration step in the serializer, and keep the existing version-1 fixture test passing.
-- After changing code generation, regenerate the samples (`dotnet run --project src/ScriptArt.Cli -- generate samples/<name>/<name>.vside`); `CheckedInSampleCodeMatchesGenerator` fails otherwise.
+- After changing code generation, regenerate the samples (`dotnet run --project src/ScriptArt.Cli -- generate samples/<name>/<name>.vside`); `CheckedInSampleCodeMatchesGenerator` fails otherwise. `samples/GodotMover` needs a restore of Godot.NET.Sdk (the CLI runs it) and is checked by `GodotProjectTests`; delete its `.godot/` folder afterwards.
 - Never load a node library (`NodeLibraryLoader`) that the user did not approve (`NodeLibraryTrust`) or name on the command line; opening a project must never run code.
-- Tests: `dotnet test tests/ScriptArt.Tests` is fast (no processes). `tests/ScriptArt.IntegrationTests` builds and runs real projects (~10 s). Run both before finishing.
+- Tests: `dotnet test tests/ScriptArt.Tests` is fast (no processes). `tests/ScriptArt.IntegrationTests` builds and runs real projects (~35 s). `tests/ScriptArt.UiTests` drives the IDE window headlessly (~5 s). Run all three before finishing.
+- Colors: add them as tokens in both theme dictionaries of `Theme.axaml` (or both palettes of `CanvasTheme`), never as literals in controls; `ThemeContrastTests` must keep passing.
 - Keep docs in `docs/` current with the code, especially ROADMAP.md and DECISIONS.md.

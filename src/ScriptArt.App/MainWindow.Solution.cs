@@ -75,7 +75,7 @@ public partial class MainWindow
     {
         bool dirty = workspace!.IsCodeFileDirty(path);
         Border row = Row(new TextBlock { Text = $"C#  {name}{(dirty ? " •" : "")}" },
-            string.Equals(shownFile, path, StringComparison.OrdinalIgnoreCase), $"{path}\nHandwritten C#: click to edit it in the Code tab.");
+            string.Equals(shownFile, path, StringComparison.OrdinalIgnoreCase), $"{path}\nHandwritten C#: click to edit it in the editor.");
         row.PointerPressed += (_, e) =>
         {
             if (e.GetCurrentPoint(row).Properties.IsLeftButtonPressed)
@@ -118,7 +118,7 @@ public partial class MainWindow
             return;
         }
 
-        LeftTabs.SelectedIndex = 0;
+        LeftTabs.SelectedItem = MyProjectTab;
         collapsedSections.Remove(FilesSection);
         addingFile = true;
         RefreshProjectPanel();
@@ -165,7 +165,7 @@ public partial class MainWindow
 
     private void OnAddPackage(object? sender, RoutedEventArgs e)
     {
-        LeftTabs.SelectedIndex = 0;
+        LeftTabs.SelectedItem = MyProjectTab;
         ShowAddPackage(ProjectPanel);
     }
 
@@ -276,6 +276,8 @@ public partial class MainWindow
             Recompile();
             AppendOutput("Added nodes for the methods of newly referenced assemblies (palette category .NET).");
         }
+
+        OfferSourceGenerators();
     }
 
     /// <summary>Runs a solution or reference command with its output in Output, then reloads the files and references.</summary>

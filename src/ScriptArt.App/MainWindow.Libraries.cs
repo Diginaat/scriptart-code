@@ -31,7 +31,7 @@ public partial class MainWindow
 
         try
         {
-            trust = NodeLibraryTrust.Load(NodeLibraryTrust.DefaultSettingsPath);
+            trust = NodeLibraryTrust.Load(NodeLibrariesPath);
         }
         catch (Exception exception) when (exception is GraphFormatException or IOException or UnauthorizedAccessException)
         {

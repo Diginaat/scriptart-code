@@ -68,11 +68,17 @@ public sealed class GraphCompiler(NodeLibrary library)
 
     /// <summary>
     /// The generated file name for a graph: <c>{Name}.g.cs</c>, or <c>{Type}.{Name}.g.cs</c> for a method or constructor of a class
-    /// or struct among <paramref name="projectGraphs"/>, since methods of different types can share a name.
+    /// or struct among <paramref name="projectGraphs"/>, since methods of different types can share a name. A class with a base type
+    /// is <c>{Name}.cs</c>: Godot attaches a script only from the file named after its class (D-047).
     /// </summary>
     public static string GeneratedFileName(GraphDocument graph, IReadOnlyList<GraphDocument>? projectGraphs = null)
     {
         ArgumentNullException.ThrowIfNull(graph);
+        if (graph.Kind == GraphKind.Class && graph.BaseType is not null)
+        {
+            return graph.Name + ".cs";
+        }
+
         return graph.Owner is not null && (projectGraphs ?? []).FirstOrDefault(type => type.Id == graph.Owner && TypeRef.IsTypeGraph(type)) is { } owner
             ? $"{owner.Name}.{graph.Name}.g.cs"
             : graph.Name + ".g.cs";
@@ -282,6 +288,23 @@ public sealed class GraphCompiler(NodeLibrary library)
             Problem($"A {kind} graph has properties, not nodes. Delete its {graph.Nodes.Count} node(s).");
         }
 
+        TypeRef? baseType = null;
+        if (graph.BaseType is { } baseName)
+        {
+            baseType = TypeRef.FromName(baseName);
+            string? problem = isStruct ? "A struct cannot derive from a class. Make it a class, or remove its base type."
+                : baseType is not { IsExternal: true } ? $"Base type '{baseName}' is not the full name of a .NET class, such as Godot.Node2D."
+                : Library.FindExternalType(baseType) is not { } found ? $"The base type {baseName} is not offered by the project's references. Restore the project's packages."
+                : !found.IsInheritable ? $"{baseName} is sealed, or has no parameterless constructor, so a class cannot derive from it."
+                : graph.TypeParameters.Count > 0 ? $"A generic class cannot derive from {baseName}: Godot cannot create it."
+                : null;
+            if (problem is not null)
+            {
+                Problem(problem);
+                baseType = null;
+            }
+        }
+
         var typeParameters = new HashSet<string>(StringComparer.Ordinal);
         foreach (string typeParameter in graph.TypeParameters)
         {
@@ -296,6 +319,9 @@ public sealed class GraphCompiler(NodeLibrary library)
             }
         }
 
+        // [Export] belongs to Godot: the class must derive from a Godot class (D-047).
+        bool isGodotClass = baseType is not null && Library.BaseTypesOf(TypeRef.ProjectType(graph.Name), options.Graphs)
+            .Any(type => type.SourceName == "Godot.GodotObject");
         var names = new HashSet<string>(StringComparer.Ordinal);
         List<IrProperty> properties = [];
         foreach (GraphProperty property in graph.Properties)
@@ -311,6 +337,8 @@ public sealed class GraphCompiler(NodeLibrary library)
                 : ExternalTypeProblem(type, createsValue: true) is { } external ? $"Property '{property.Name}': {external}"
                 : initial is null ? $"Property '{property.Name}': initial value: {error}"
                 : type.IsProjectType && Contains(type.Name, graph.Name, options.Graphs) ? $"Property '{property.Name}' makes {graph.Name} contain itself, so a {graph.Name} could never be created."
+                : property.Export && !isGodotClass ? $"Property '{property.Name}' is exported, but only a class deriving from a Godot class can export properties. Set its base class, or clear Export."
+                : property.Export && !(type.Keyword is not null || type.IsExternal) ? $"Property '{property.Name}' is exported, but Godot cannot export a {type.DisplayName}. Export bool, int, double, string, or a Godot type."
                 : null;
             if (problem is not null)
             {
@@ -321,7 +349,42 @@ public sealed class GraphCompiler(NodeLibrary library)
                 // A class property of a type parameter starts as default!, which the nullable analysis would otherwise warn about
                 // (CS8618); a struct property needs no initializer, and one would make the struct need a constructor.
                 IrExpression? initializer = initial is IrDefault ? (isStruct ? null : initial) : IsDefaultValue(initial!) ? null : initial;
-                properties.Add(new IrProperty(property.Name, type!, initializer));
+                properties.Add(new IrProperty(property.Name, type!, initializer) { IsExported = property.Export });
+            }
+        }
+
+        // Godot signals: [Signal] delegates that Godot's generator turns into events and EmitSignal methods (D-051).
+        List<IrSignal> signals = [];
+        foreach (GraphSignal signal in graph.Signals)
+        {
+            var parameterNames = new HashSet<string>(StringComparer.Ordinal);
+            List<IrParameter> parameters = [];
+            string? problem = !isGodotClass ? $"Signal '{signal.Name}': only a class deriving from a Godot class can declare signals. Set its base class."
+                : !IsValidIdentifier(signal.Name) ? $"Signal '{signal.Name}' does not have a valid C# name."
+                : !names.Add(signal.Name) ? $"Signal '{signal.Name}' has the name of another signal or a property."
+                : signal.Name == graph.Name ? $"Signal '{signal.Name}' cannot have the name of its class."
+                : null;
+            foreach (GraphParameter parameter in signal.Parameters)
+            {
+                TypeRef? type = TypeRef.FromName(parameter.Type, options.Graphs, graph);
+                problem ??= !IsValidIdentifier(parameter.Name) ? $"Signal '{signal.Name}': '{parameter.Name}' is not a valid C# name."
+                    : !parameterNames.Add(parameter.Name) ? $"Signal '{signal.Name}' has more than one value named '{parameter.Name}'."
+                    : type is null || !(type.Keyword is not null || type.IsExternal) ? $"Signal '{signal.Name}': Godot cannot send a {parameter.Type}. Use bool, int, double, string, or a Godot type."
+                    : ExternalTypeProblem(type, createsValue: false) is { } external ? $"Signal '{signal.Name}': {external}"
+                    : null;
+                if (type is not null)
+                {
+                    parameters.Add(new IrParameter(parameter.Name, type));
+                }
+            }
+
+            if (problem is not null)
+            {
+                Problem(problem);
+            }
+            else
+            {
+                signals.Add(new IrSignal(signal.Name, parameters));
             }
         }
 
@@ -333,7 +396,11 @@ public sealed class GraphCompiler(NodeLibrary library)
         bool needsDefaultConstructor = !constructors.Any(constructor => constructor.Parameters.Count == 0)
             && (isStruct ? properties.Any(property => property.Initializer is not null) : constructors.Length > 0);
         return new IrClass(options.RootNamespace, graph.Name, [], graph.Id, IsPartial: members.Length > 0,
-            Kind: isStruct ? IrClassKind.Struct : IrClassKind.Class, Properties: properties, TypeParameters: graph.TypeParameters, DefaultConstructor: needsDefaultConstructor);
+            Kind: isStruct ? IrClassKind.Struct : IrClassKind.Class, Properties: properties, TypeParameters: graph.TypeParameters, DefaultConstructor: needsDefaultConstructor)
+        {
+            BaseType = baseType,
+            Signals = signals,
+        };
     }
 
     /// <summary>True when the type named <paramref name="typeName"/> is, or has a property that contains, the type named <paramref name="target"/>.</summary>
@@ -453,6 +520,21 @@ public sealed class GraphCompiler(NodeLibrary library)
         IrMethod method = isConstructor ? new IrMethod(owner?.Name ?? graph.Name, TypeRef.Void, MethodLowerer.Parameters(graph, options.Graphs), body, graph.Id, IsStatic: false, IsConstructor: true)
             : isFunction ? new IrMethod(graph.Name, returnType, MethodLowerer.Parameters(graph, options.Graphs), body, graph.Id, IsStatic: owner is null, IsAsync: isAsync)
             : new IrMethod("Main", TypeRef.Void, [], body, graph.Id, IsAsync: isAsync);
+        TypeRef? ownerBase = owner?.BaseType is { } ownerBaseName && TypeRef.FromName(ownerBaseName) is { IsExternal: true } resolvedBase ? resolvedBase : null;
+        if (ownerBase is not null && !isConstructor
+            && Library.OverriddenMethod(owner!, graph.Name, [.. method.Parameters.Select(parameter => parameter.Type)], options.Graphs) is { } overridden)
+        {
+            // A method named and typed like a virtual method of the base class, such as Godot's _Process(double), overrides it.
+            if (overridden.ReturnType != returnType || isAsync)
+            {
+                diagnostics.Add(new(DiagnosticIds.InvalidFunction, DiagnosticSeverity.Error,
+                    $"{graph.Name} overrides {overridden.DisplayName}, so it must return {overridden.ReturnType.DisplayName}{(isAsync ? " and cannot wait for async calls" : "")}.", graph.Id));
+                return null;
+            }
+
+            method = method with { IsOverride = true };
+        }
+
         IrSimplifier.Simplify(method);
 
         // Functions are methods of the program class, and methods and constructors of a class or struct belong to it, so each class
@@ -460,7 +542,10 @@ public sealed class GraphCompiler(NodeLibrary library)
         if (owner is not null)
         {
             return new IrClass(options.RootNamespace, owner.Name, [method], graph.Id, IsPartial: true,
-                Kind: owner.Kind == GraphKind.Struct ? IrClassKind.Struct : IrClassKind.Class, TypeParameters: owner.TypeParameters);
+                Kind: owner.Kind == GraphKind.Struct ? IrClassKind.Struct : IrClassKind.Class, TypeParameters: owner.TypeParameters)
+            {
+                BaseType = ownerBase,
+            };
         }
 
         return isFunction

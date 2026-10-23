@@ -14,9 +14,13 @@ namespace ScriptArt.App;
 /// </summary>
 public partial class MainWindow
 {
+    private const string GenerationPreviewNote = "Nothing is written until you choose Write Files. Turn this preview off with Build, Preview Changes Before Generating.";
+
+    private readonly DiffColorizer diffColorizer = new();
+
     private void InitializeDiffPreview()
     {
-        DiffEditor.TextArea.TextView.LineTransformers.Add(new DiffColorizer());
+        DiffEditor.TextArea.TextView.LineTransformers.Add(diffColorizer);
         DiffFileList.SelectionChanged += (_, _) =>
         {
             if (DiffFileList.SelectedItem is ListBoxItem { Tag: (GeneratedFileChange change, string name) })
@@ -78,12 +82,12 @@ public partial class MainWindow
             string name = Path.GetRelativePath(project.DirectoryPath, change.Path).Replace('\\', '/');
             (string mark, string brush) = change.Kind switch
             {
-                GeneratedFileChangeKind.Added => ("Added", "#5CCB7A"),
-                GeneratedFileChangeKind.Deleted => ("Deleted", "#F06A6A"),
-                _ => ("Changed", "#E8B44C"),
+                GeneratedFileChangeKind.Added => ("Added", "IdeSuccess"),
+                GeneratedFileChangeKind.Deleted => ("Deleted", "IdeError"),
+                _ => ("Changed", "IdeWarning"),
             };
             var row = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
-            row.Children.Add(new TextBlock { Text = mark, Width = 58, Foreground = new SolidColorBrush(Color.Parse(brush)) });
+            row.Children.Add(new TextBlock { Text = mark, Width = 58, Foreground = Token(brush) });
             row.Children.Add(new TextBlock { Text = name });
             DiffFileList.Items.Add(new ListBoxItem { Content = row, Tag = (change, name) });
         }
@@ -106,23 +110,37 @@ public partial class MainWindow
     private async void OnWriteGeneratedFiles(object? sender, RoutedEventArgs e)
     {
         HideDiffPreview();
+        if (showingRecovery)
+        {
+            EndRecoveryPreview();
+            RestoreRecovery();
+            return;
+        }
+
         await GenerateAsync(showOutput: false);
     }
 
     private void OnCancelDiff(object? sender, RoutedEventArgs e)
     {
         HideDiffPreview();
+        if (showingRecovery)
+        {
+            EndRecoveryPreview();
+            ClearRecovery();
+            SetStatus("Discarded the unsaved work from the earlier session.");
+            return;
+        }
+
         SetStatus("Nothing was written.");
     }
 
     /// <summary>Colors a unified diff: added lines green, removed lines red, hunk headers blue.</summary>
     private sealed class DiffColorizer : DocumentColorizingTransformer
     {
-        private static readonly IBrush Added = new SolidColorBrush(Color.Parse("#7FD68F"));
-        private static readonly IBrush AddedBackground = new SolidColorBrush(Color.Parse("#1F3A27"));
-        private static readonly IBrush Removed = new SolidColorBrush(Color.Parse("#F08A8A"));
-        private static readonly IBrush RemovedBackground = new SolidColorBrush(Color.Parse("#3F2326"));
-        private static readonly IBrush Header = new SolidColorBrush(Color.Parse("#6CA6FF"));
+        private (IBrush Added, IBrush AddedBackground, IBrush Removed, IBrush RemovedBackground, IBrush Header) colors = IdeColors.Diff(light: false);
+
+        /// <summary>Uses the light or dark colors; the view redraws to show them.</summary>
+        public void UseTheme(bool light) => colors = IdeColors.Diff(light);
 
         protected override void ColorizeLine(DocumentLine line)
         {
@@ -134,9 +152,9 @@ public partial class MainWindow
             string start = CurrentContext.Document.GetText(line.Offset, Math.Min(3, line.Length));
             (IBrush? foreground, IBrush? background) = start switch
             {
-                "+++" or "---" or ['@', '@', ..] => (Header, null),
-                ['+', ..] => (Added, AddedBackground),
-                ['-', ..] => (Removed, RemovedBackground),
+                "+++" or "---" or ['@', '@', ..] => (colors.Header, null),
+                ['+', ..] => (colors.Added, colors.AddedBackground),
+                ['-', ..] => (colors.Removed, colors.RemovedBackground),
                 _ => ((IBrush?)null, (IBrush?)null),
             };
             if (foreground is null)

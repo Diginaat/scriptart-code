@@ -32,6 +32,19 @@ public enum IrBinaryOperator
 public sealed record IrBinary(IrBinaryOperator Operator, IrExpression Left, IrExpression Right, TypeRef Type)
     : IrExpression(Type);
 
+/// <summary>
+/// A type test that names its result: <c>operand is Type local</c>. True when <paramref name="Operand"/> is a
+/// <paramref name="Tested"/>; <paramref name="Local"/> then holds it, and is assigned only where the test is true.
+/// </summary>
+public sealed record IrTypeTest(IrExpression Operand, TypeRef Tested, IrLocal Local) : IrExpression(TypeRef.Boolean);
+
+/// <summary>
+/// A lambda, such as the handler of a signal: <c>(parameters) =&gt; { body }</c>. With <paramref name="TypedParameters"/> false the
+/// parameter types come from the delegate it is converted to, as for an event; otherwise they are written. Its type is not a graph
+/// type, so it is only passed where C# gives it one.
+/// </summary>
+public sealed record IrLambda(IReadOnlyList<IrLocal> Parameters, IrBlock Body, bool TypedParameters) : IrExpression(TypeRef.Object);
+
 public enum IrUnaryOperator
 {
     LogicalNot,

@@ -48,11 +48,13 @@ public sealed partial class MainWindow : Window
             Recompile();
         };
 
-        CodeEditor.SyntaxHighlighting = DarkCSharpHighlighting();
         CodeEditor.TextArea.Caret.PositionChanged += (_, _) => OnCodeCaretMoved();
         InitializeCodeView();
         InitializeDebugView();
         InitializeDiffPreview();
+        InitializeExplorer();
+        InitializePreferences();
+        InitializeAutosave();
 
         PaletteSearch.TextChanged += (_, _) => PopulatePalette();
         PaletteSearch.KeyDown += (_, e) =>
@@ -241,6 +243,12 @@ public sealed partial class MainWindow : Window
             (Key.Y, true, false) or (Key.Z, true, true) => () => OnRedo(this, e),
             (Key.B, true, true) => () => OnBuild(this, e),
             (Key.P, true, true) => ShowCommandPalette,
+            (Key.P, true, false) => () => OnOpenFile(this, e),
+            (Key.OemComma, true, false) => () => OnShowPreferences(this, e),
+            (Key.W, true, false) => () => OnCloseTab(this, e),
+            (Key.E, true, true) => () => OnShowExplorer(this, e),
+            (Key.Tab, true, false) => () => CycleDocument(1),
+            (Key.Tab, true, true) => () => CycleDocument(-1),
             (Key.X, true, false) when graph => () => OnCut(this, e),
             (Key.C, true, false) when graph => () => OnCopy(this, e),
             (Key.V, true, false) when graph => () => OnPaste(this, e),
@@ -280,9 +288,16 @@ public sealed partial class MainWindow : Window
         runningProgram?.Stop();
         buildCancellation?.Cancel();
         EndDebugging();
+        StopWatchingProject();
+        autosaveTimer.Stop();
     }
 
-    private async void OnNewProject(object? sender, RoutedEventArgs e)
+    private void OnNewProject(object? sender, RoutedEventArgs e) => CreateProject(VisualProject.Create, "project");
+
+    // A Godot 4 C# project (D-047): the folder may already hold a Godot project without C#.
+    private void OnNewGodotProject(object? sender, RoutedEventArgs e) => CreateProject(VisualProject.CreateGodot, "Godot project");
+
+    private async void CreateProject(Func<string, string, VisualProject> create, string kind)
     {
         IReadOnlyList<IStorageFolder> folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
@@ -297,12 +312,12 @@ public sealed partial class MainWindow : Window
         string name = ProjectNameFromFolder(Path.GetFileName(Path.TrimEndingDirectorySeparator(path)));
         try
         {
-            OpenWorkspace(VisualProject.Create(path, name));
-            SetStatus($"Created project {name} in {path}.");
+            OpenWorkspace(create(path, name));
+            SetStatus($"Created {kind} {name} in {path}.");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
-            ReportError("Could not create the project", exception);
+            ReportError($"Could not create the {kind}", exception);
         }
     }
 
@@ -338,9 +353,30 @@ public sealed partial class MainWindow : Window
 
     private void OnExit(object? sender, RoutedEventArgs e) => Close();
 
-    private void OnUndo(object? sender, RoutedEventArgs e) => workspace?.Editor.Undo();
+    // Undo and redo act on the file in the editor while one is shown, otherwise on the graph.
+    private void OnUndo(object? sender, RoutedEventArgs e)
+    {
+        if (shownFile is not null)
+        {
+            FileEditor.Undo();
+        }
+        else
+        {
+            workspace?.Editor.Undo();
+        }
+    }
 
-    private void OnRedo(object? sender, RoutedEventArgs e) => workspace?.Editor.Redo();
+    private void OnRedo(object? sender, RoutedEventArgs e)
+    {
+        if (shownFile is not null)
+        {
+            FileEditor.Redo();
+        }
+        else
+        {
+            workspace?.Editor.Redo();
+        }
+    }
 
     private void OnDelete(object? sender, RoutedEventArgs e) => GraphCanvas.DeleteSelection();
 
@@ -399,6 +435,13 @@ public sealed partial class MainWindow : Window
 
     private async void OnRun(object? sender, RoutedEventArgs e)
     {
+        bool isGodot = workspace?.Project.IsGodotProject == true;
+        if (isGodot && preferences.GodotPath is null)
+        {
+            SetStatus("Choose the Godot 4 .NET executable in Tools → Preferences to run Godot projects.");
+            return;
+        }
+
         if (!await BuildAsync())
         {
             return;
@@ -406,10 +449,20 @@ public sealed partial class MainWindow : Window
 
         try
         {
-            AppendOutput($"> dotnet run --project {workspace!.Project.CsprojPath}");
-            runningProgram = DotNetCli.StartRun(workspace.Project.CsprojPath, Configuration, line => Dispatcher.UIThread.Post(() => AppendOutput(line)));
+            void Output(string line) => Dispatcher.UIThread.Post(() => AppendOutput(line));
+            if (isGodot)
+            {
+                AppendOutput($"> {preferences.GodotPath} --path {workspace!.Project.DirectoryPath}");
+                runningProgram = DotNetProcess.StartGodot(preferences.GodotPath!, workspace.Project.DirectoryPath, Output);
+            }
+            else
+            {
+                AppendOutput($"> dotnet run --project {workspace!.Project.CsprojPath}");
+                runningProgram = DotNetCli.StartRun(workspace.Project.CsprojPath, Configuration, Output);
+            }
+
             UpdateCommandStates();
-            SetStatus("Running. Type input below the output and press Enter.");
+            SetStatus(isGodot ? "The game is running. Its output appears below; Stop closes it." : "Running. Type input below the output and press Enter.");
             InputBox.Focus();
             int exitCode = await runningProgram.WaitForExitAsync();
             AppendOutput($"Program exited with code {exitCode}.");
@@ -447,6 +500,7 @@ public sealed partial class MainWindow : Window
 
     private void OnDiscardAndClose(object? sender, RoutedEventArgs e)
     {
+        ClearRecovery();
         closeConfirmed = true;
         Close();
     }
@@ -462,17 +516,17 @@ public sealed partial class MainWindow : Window
 
         EndDebugging();
         OutputEditor.Text = "";
+        project.ApprovedSourceGenerators = preferences.ApprovedSourceGenerators;
         workspace = Workspace.Open(project, ApprovedNodeLibraries());
         workspace.Changed += OnGraphChanged;
         fileDiagnostics = [];
-        shownFile = null;
-        loadingCode = true;
-        CodeEditor.Document = generatedDocument;
-        CodeEditor.IsReadOnly = true;
-        loadingCode = false;
+        ResetDocuments();
         EmptyState.IsVisible = false;
         ProjectText.Text = $"{project.Name}  ·  {project.DirectoryPath}";
         ShowOpenGraph();
+        WatchProject(project);
+        RememberRecentProject(project.ProjectFilePath);
+        OpenRecovery(project);
         CheckHandwrittenCode();
         foreach (string problem in workspace.LibraryProblems)
         {
@@ -482,7 +536,11 @@ public sealed partial class MainWindow : Window
         ReportOutdatedSchema(project);
         if (workspace.References.PackagesNotRestored)
         {
-            SetStatus("The project's NuGet packages are not restored yet. Build once (Ctrl+Shift+B) to add their methods to the palette.");
+            RestorePackages();
+        }
+        else
+        {
+            OfferSourceGenerators();
         }
     }
 
@@ -517,6 +575,7 @@ public sealed partial class MainWindow : Window
         RefreshPaletteForVariables();
         ShowInspector();
         ShowCompilation(workspace.LastCompilation);
+        ShowGraphDocument();
         UpdateTitle();
         UpdateCommandStates();
     }
@@ -528,6 +587,7 @@ public sealed partial class MainWindow : Window
         recompileTimer.Start();
         UpdateTitle();
         UpdateCommandStates();
+        RefreshDocumentTabs();
         ShowInspector();
         ShowTypeGraphHint();
         RefreshPaletteForVariables();
@@ -566,8 +626,11 @@ public sealed partial class MainWindow : Window
         try
         {
             workspace.Save();
+            ClearRecovery();
             UpdateTitle();
             UpdateCodeBanner();
+            UpdateFileBanner();
+            RefreshDocumentTabs();
             SetStatus("Saved.");
             return true;
         }
@@ -606,7 +669,7 @@ public sealed partial class MainWindow : Window
             row.Children.Add(new TextBlock
             {
                 Text = diagnostic.Severity == DiagnosticSeverity.Error ? "Error" : diagnostic.Severity == DiagnosticSeverity.Warning ? "Warning" : "Info",
-                Foreground = (IBrush)this.FindResource(diagnostic.Severity == DiagnosticSeverity.Error ? "IdeError" : "IdeWarning")!,
+                Foreground = Token(diagnostic.Severity == DiagnosticSeverity.Error ? "IdeError" : "IdeWarning"),
                 FontWeight = FontWeight.SemiBold,
                 Width = 60,
             });
@@ -624,7 +687,7 @@ public sealed partial class MainWindow : Window
         int errors = diagnostics.Count(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         int warnings = diagnostics.Count(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning);
         ProblemSummary.Text = errors == 0 && warnings == 0 ? "✓ No problems" : $"{errors} error(s), {warnings} warning(s)";
-        ProblemSummary.Foreground = (IBrush)this.FindResource(errors > 0 ? "IdeError" : warnings > 0 ? "IdeWarning" : "IdeTextSecondary")!;
+        ProblemSummary.Foreground = Token(errors > 0 ? "IdeError" : warnings > 0 ? "IdeWarning" : "IdeTextSecondary");
 
         GraphCanvas.NodeStates = diagnostics
             .Where(diagnostic => diagnostic.NodeId is not null)
@@ -673,7 +736,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Selects the generated lines of the selected node (node → code navigation).</summary>
     private void HighlightSelectedNodeCode()
     {
-        if (shownFile is not null || workspace?.LastCompilation.Source is not { } source || GraphCanvas.SelectedItems.Count != 1)
+        if (workspace?.LastCompilation.Source is not { } source || GraphCanvas.SelectedItems.Count != 1)
         {
             return;
         }
@@ -695,7 +758,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Selects the node that produced the line under the caret (code → node navigation).</summary>
     private void OnCodeCaretMoved()
     {
-        if (syncingCodeSelection || shownFile is not null || workspace?.LastCompilation.Source is not GeneratedSource source)
+        if (syncingCodeSelection || workspace?.LastCompilation.Source is not GeneratedSource source)
         {
             return;
         }
@@ -730,7 +793,7 @@ public sealed partial class MainWindow : Window
     {
         Title = workspace is null
             ? "ScriptArt Code"
-            : $"{workspace.Graph.Graph.Name}{(workspace.IsDirty ? " •" : "")} — {workspace.Project.Name} — ScriptArt Code";
+            : $"{(shownFile is null ? workspace.Graph.Graph.Name : Path.GetFileName(shownFile))}{(workspace.IsDirty ? " •" : "")} — {workspace.Project.Name} — ScriptArt Code";
     }
 
     private void UpdateCommandStates()
@@ -740,11 +803,16 @@ public sealed partial class MainWindow : Window
         bool paused = debugSession is not null && debugStop is not null;
         SaveButton.IsEnabled = SaveMenuItem.IsEnabled = open;
         AddNewButton.IsEnabled = AddFunctionMenuItem.IsEnabled = AddClassMenuItem.IsEnabled = AddStructMenuItem.IsEnabled = open;
-        AddFileMenuItem.IsEnabled = RefreshFilesMenuItem.IsEnabled = open;
+        AddFileMenuItem.IsEnabled = RefreshFilesMenuItem.IsEnabled = ApproveGeneratorsMenuItem.IsEnabled = open;
         AddPackageMenuItem.IsEnabled = AddProjectReferenceMenuItem.IsEnabled = idle;
         CreateSolutionMenuItem.IsEnabled = idle && workspace!.Solution is null;
+        NewSolutionProjectMenuItem.IsEnabled = AddExistingProjectMenuItem.IsEnabled = idle && workspace!.Solution is not null;
+        OpenFileMenuItem.IsEnabled = ExplorerMenuItem.IsEnabled = OpenInCodeMenuItem.IsEnabled = open;
+        CloseTabMenuItem.IsEnabled = open && documents.Count > 1;
         GoToDefinitionMenuItem.IsEnabled = open;
         DebugButton.IsEnabled = DebugMenuItem.IsEnabled = idle;
+        DebugToolbarSeparator.IsVisible = ContinueButton.IsVisible = StepOverButton.IsVisible = StepIntoButton.IsVisible = StepOutButton.IsVisible
+            = debugSession is not null;
         ContinueButton.IsEnabled = ContinueMenuItem.IsEnabled = paused;
         StepOverButton.IsEnabled = StepOverMenuItem.IsEnabled = paused;
         StepIntoButton.IsEnabled = StepIntoMenuItem.IsEnabled = paused;
@@ -752,8 +820,8 @@ public sealed partial class MainWindow : Window
         PauseMenuItem.IsEnabled = debugSession is not null && debugStop is null;
         ToggleBreakpointMenuItem.IsEnabled = open;
         ClearBreakpointsMenuItem.IsEnabled = open && workspace!.Breakpoints.Count > 0;
-        UndoButton.IsEnabled = UndoMenuItem.IsEnabled = open && workspace!.Editor.CanUndo;
-        RedoButton.IsEnabled = RedoMenuItem.IsEnabled = open && workspace!.Editor.CanRedo;
+        UndoButton.IsEnabled = UndoMenuItem.IsEnabled = open && (shownFile is not null ? FileEditor.CanUndo : workspace!.Editor.CanUndo);
+        RedoButton.IsEnabled = RedoMenuItem.IsEnabled = open && (shownFile is not null ? FileEditor.CanRedo : workspace!.Editor.CanRedo);
         ToolTip.SetTip(UndoButton, workspace?.Editor.UndoDescription is { } undo ? $"Undo {undo} (Ctrl+Z)" : "Undo (Ctrl+Z)");
         ToolTip.SetTip(RedoButton, workspace?.Editor.RedoDescription is { } redo ? $"Redo {redo} (Ctrl+Y)" : "Redo (Ctrl+Y)");
         DeleteMenuItem.IsEnabled = open && GraphCanvas.SelectedItems.Count > 0;
@@ -767,27 +835,6 @@ public sealed partial class MainWindow : Window
         RunButton.IsEnabled = RunMenuItem.IsEnabled = idle;
         StopButton.IsEnabled = StopMenuItem.IsEnabled = buildCancellation is not null || runningProgram is not null || debugSession is not null;
         SendInputButton.IsEnabled = InputBox.IsEnabled = runningProgram is not null || debugSession is not null;
-    }
-
-    /// <summary>AvaloniaEdit's built-in C# definition, recolored for the dark theme (its defaults target light backgrounds).</summary>
-    private static IHighlightingDefinition DarkCSharpHighlighting()
-    {
-        IHighlightingDefinition definition = HighlightingManager.Instance.GetDefinition("C#");
-        foreach (HighlightingColor color in definition.NamedHighlightingColors)
-        {
-            string hex = color.Name switch
-            {
-                var name when name.Contains("Comment", StringComparison.OrdinalIgnoreCase) => "#6A9955",
-                var name when name.Contains("String", StringComparison.OrdinalIgnoreCase) || name.Contains("Char", StringComparison.OrdinalIgnoreCase) => "#CE9178",
-                var name when name.Contains("Number", StringComparison.OrdinalIgnoreCase) => "#B5CEA8",
-                var name when name.Contains("Method", StringComparison.OrdinalIgnoreCase) => "#DCDCAA",
-                var name when name.Contains("Preprocessor", StringComparison.OrdinalIgnoreCase) => "#9B9B9B",
-                _ => "#569CD6",
-            };
-            color.Foreground = new SimpleHighlightingBrush(Color.Parse(hex));
-        }
-
-        return definition;
     }
 
     /// <summary>Derives a valid C# project name from a folder name, for example "my app" becomes "my_app".</summary>

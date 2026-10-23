@@ -16,6 +16,15 @@ public enum NestedBlock
     Try,
     Catch,
     Finally,
+
+    /// <summary>A branch of an if statement that names a value only inside it, such as Cast To's Succeeded.</summary>
+    Conditional,
+
+    /// <summary>
+    /// The body of a handler that runs later, such as a signal's: a lambda. Break, Continue, and Rethrow cannot leave it, and Return
+    /// ends the handler, not the method.
+    /// </summary>
+    Handler,
 }
 
 /// <summary>

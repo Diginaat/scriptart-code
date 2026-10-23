@@ -79,4 +79,24 @@ public sealed class TextDiffTests
         Assert.Equal(3_000, lines.Count(line => line.Kind == DiffKind.Removed));
         Assert.Equal(3_000, lines.Count(line => line.Kind == DiffKind.Added));
     }
+
+    [Theory]
+    [InlineData("a\nb\nc\nd\ne\n", "A\nb\nc\nd\ne\n", "a\nb\nc\nd\nE\n", "A\nb\nc\nd\nE\n")]
+    [InlineData("a\nb\nc\n", "a\nX\nb\nc\n", "a\nb\nc\nY\n", "a\nX\nb\nc\nY\n")]
+    [InlineData("a\nb\nc\n", "a\nB\nc\n", "a\nB\nc\n", "a\nB\nc\n")]
+    [InlineData("a\nb\nc\n", "a\nb\nc\n", "a\nc\n", "a\nc\n")]
+    [InlineData("", "x\n", "", "x")]
+    public void MergeCombinesChangesToDifferentLines(string baseText, string ours, string theirs, string expected)
+    {
+        Assert.Equal(expected, TextDiff.Merge(baseText, ours, theirs));
+    }
+
+    [Theory]
+    [InlineData("a\nb\nc\n", "a\nX\nc\n", "a\nY\nc\n")]
+    [InlineData("a\nb\nc\n", "a\nX\nc\n", "a\nb\nY\n")]
+    [InlineData("a\nb\n", "a\nX\nb\n", "a\nY\nb\n")]
+    public void MergeReportsChangesToTheSameOrAdjacentLines(string baseText, string ours, string theirs)
+    {
+        Assert.Null(TextDiff.Merge(baseText, ours, theirs));
+    }
 }

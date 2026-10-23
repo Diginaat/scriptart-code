@@ -20,7 +20,7 @@ GraphModel ──► NodeSdk ──► Compiler ──► NodeEditor ──┐
 | Compiler | Built-in node library and loading of external ones, validation, control-flow analysis, simplification, incremental compilation, Roslyn emission and verification | NodeSdk, Microsoft.CodeAnalysis.CSharp |
 | NodeEditor | `GraphEditor`: every graph edit as an undoable operation, live connection checks; `SpatialIndex` for the canvas | Compiler |
 | ProjectSystem | `.vside` project files, schema migration, approved node libraries, project layout, generated-file ownership and change plans, handwritten files, `dotnet build`/`run`, solutions and references through the `dotnet` CLI, debugging over the Debug Adapter Protocol (`Debugging/`) | Compiler |
-| App | Desktop IDE: canvas, palette, My Project, inspector, problems, code view and handwritten-file editor, generation preview, debugger, output | NodeEditor, ProjectSystem, Avalonia, AvaloniaEdit |
+| App | Desktop IDE: canvas, My Project, palette, Files and editor tabs, inspector, problems, code view and handwritten-file editor, generation preview, debugger, output | NodeEditor, ProjectSystem, Avalonia, AvaloniaEdit |
 | Cli | `vside generate|diff|build|run|migrate` | ProjectSystem |
 
 Several subsystems suggested in the original plan (TypeSystem, Diagnostics, CodeGeneration, NodeLibrary, Serialization, BuildSystem) are folders inside the projects above rather than separate assemblies. They become separate projects when they gain a consumer that needs them independently, as the node-library SDK did (see [DECISIONS.md](DECISIONS.md), D-004 and D-038).
@@ -43,7 +43,7 @@ MyApp/
   Graphs/Program.graph.json
   Generated/Program.g.cs owned by the generator (header-marked)
   MyApp.slnx             optional solution, created on request
-  *.cs                   handwritten code, edited in the IDE's Code tab and saved only on request
+  *.cs                   handwritten code, edited in the IDE's editor tabs and saved only on request
 ```
 
 The project file deliberately does not end in `proj`; MSBuild treats `*.*proj` files as projects, which would make a bare `dotnet build` in the folder ambiguous.

@@ -68,7 +68,7 @@ public partial class MainWindow
         var delete = new Button { Content = "✕", Padding = new Avalonia.Thickness(8, 4) };
         ToolTip.SetTip(delete, $"Delete '{variable.Name}' and its Get and Set nodes");
         var value = new TextBox { Text = variable.Value, PlaceholderText = "Initial value", Margin = new Avalonia.Thickness(0, 4, 0, 0) };
-        var error = new TextBlock { Foreground = (IBrush)this.FindResource("IdeError")!, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+        var error = new TextBlock { Foreground = Token("IdeError"), TextWrapping = TextWrapping.Wrap, FontSize = 12 };
 
         var row = new DockPanel { Margin = new Avalonia.Thickness(0, 6, 0, 0) };
         DockPanel.SetDock(delete, Dock.Right);

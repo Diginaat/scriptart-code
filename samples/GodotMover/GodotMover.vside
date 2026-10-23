@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "name": "GodotMover",
+  "rootNamespace": "GodotMover",
+  "graphs": [
+    "Graphs/Player.graph.json",
+    "Graphs/Player._PhysicsProcess.graph.json"
+  ]
+}

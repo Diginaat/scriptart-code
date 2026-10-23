@@ -1,6 +1,9 @@
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
 using AvaloniaEdit.Document;
+using AvaloniaEdit.Highlighting;
+using AvaloniaEdit.Search;
 using ScriptArt.Compiler;
 using ScriptArt.Compiler.Diagnostics;
 using ScriptArt.Compiler.Nodes;
@@ -10,16 +13,17 @@ using ScriptArt.ProjectSystem;
 namespace ScriptArt.App;
 
 /// <summary>
-/// The Code tab: the open graph's generated code (read-only, synchronized with node selection) or a handwritten C# file, which is
-/// edited in place, saved with the project, and checked with Roslyn as you type. Go to Definition (F12) works from nodes and from
-/// either kind of code.
+/// Code views. The Code tab at the bottom shows the open graph's generated code (read-only, synchronized with node selection).
+/// Files open in the editor area as tabs beside the graphs (D-043): handwritten C# is checked with Roslyn as you type; the
+/// <c>.csproj</c>, solutions, and other text files are edited as text; generated files and the project file open read-only. Edits are
+/// saved with the project (Ctrl+S). Go to Definition (F12) works from nodes and from either code view.
 /// </summary>
 public partial class MainWindow
 {
     private readonly TextDocument generatedDocument = new();
     private readonly DispatcherTimer checkTimer = new() { Interval = TimeSpan.FromMilliseconds(600) };
 
-    // The handwritten file shown in the Code tab; null while it shows generated code.
+    // The file shown in the editor area; null while a graph is shown.
     private string? shownFile;
 
     // Roslyn diagnostics of handwritten files from the latest check, shown in Problems with the open graph's diagnostics.
@@ -30,16 +34,23 @@ public partial class MainWindow
     private void InitializeCodeView()
     {
         CodeEditor.Document = generatedDocument;
-        CodeEditor.TextChanged += (_, _) =>
+        SearchPanel.Install(CodeEditor);
+        SearchPanel.Install(FileEditor);
+        FileEditor.TextChanged += (_, _) =>
         {
             if (!loadingCode && shownFile is not null)
             {
-                UpdateCodeBanner();
+                UpdateFileBanner();
+                RefreshDocumentTabs();
                 UpdateTitle();
-                checkTimer.Stop();
-                checkTimer.Start();
+                if (shownFile.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                {
+                    checkTimer.Stop();
+                    checkTimer.Start();
+                }
             }
         };
+        FileEditor.TextArea.Caret.PositionChanged += (_, _) => UpdateFileStatus();
         checkTimer.Tick += (_, _) =>
         {
             checkTimer.Stop();
@@ -47,27 +58,17 @@ public partial class MainWindow
         };
     }
 
-    private void OnShowGeneratedCode(object? sender, RoutedEventArgs e) => ShowGeneratedCode();
-
-    /// <summary>Shows the open graph's generated code in the Code tab.</summary>
+    /// <summary>Shows the open graph's generated code in the Code tab at the bottom.</summary>
     private void ShowGeneratedCode()
     {
-        if (shownFile is null)
-        {
-            return;
-        }
-
-        shownFile = null;
-        loadingCode = true;
-        CodeEditor.Document = generatedDocument;
-        CodeEditor.IsReadOnly = true;
-        loadingCode = false;
-        UpdateCodeBanner();
+        BottomTabs.SelectedItem = CodeTab;
         HighlightSelectedNodeCode();
-        RefreshProjectPanel();
     }
 
-    /// <summary>Opens a handwritten file in the Code tab, with the caret at <paramref name="line"/> and <paramref name="column"/> when given.</summary>
+    /// <summary>
+    /// Opens a file of the project in the editor area, with the caret at <paramref name="line"/> and <paramref name="column"/> when
+    /// given. Graphs open on the canvas instead, and files that are not text are refused.
+    /// </summary>
     private void ShowCodeFile(string path, int? line = null, int column = 1)
     {
         if (workspace is null)
@@ -75,50 +76,156 @@ public partial class MainWindow
             return;
         }
 
-        TextDocument document;
-        try
+        string fullPath = Path.GetFullPath(path);
+        ProjectFileKind kind = ProjectFiles.KindOf(workspace.Project, fullPath);
+        if (kind == ProjectFileKind.Graph)
         {
-            document = workspace.OpenCodeFile(path);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            ReportError($"Could not open {Path.GetFileName(path)}", exception);
+            if (workspace.Project.Graphs.FirstOrDefault(graph => string.Equals(Path.GetFullPath(Path.Combine(workspace.Project.DirectoryPath, graph.RelativePath)), fullPath, StringComparison.OrdinalIgnoreCase)) is { } projectGraph)
+            {
+                OpenProjectGraph(projectGraph);
+            }
+
             return;
         }
 
-        shownFile = Path.GetFullPath(path);
+        if (kind == ProjectFileKind.Binary)
+        {
+            SetStatus($"{Path.GetFileName(fullPath)} is not a text file, so it does not open in the editor.");
+            return;
+        }
+
+        TextDocument document;
+        try
+        {
+            document = workspace.OpenCodeFile(fullPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ReportError($"Could not open {Path.GetFileName(fullPath)}", exception);
+            return;
+        }
+
+        EndInlineEdit(commit: true);
+        HideActionMenu();
+        shownFile = fullPath;
         loadingCode = true;
-        CodeEditor.Document = document;
-        CodeEditor.IsReadOnly = false;
+        FileEditor.Document = document;
+        FileEditor.IsReadOnly = kind is ProjectFileKind.Generated or ProjectFileKind.ProjectFile;
+        FileEditor.SyntaxHighlighting = HighlightingFor(fullPath);
         loadingCode = false;
-        UpdateCodeBanner();
-        BottomTabs.SelectedItem = CodeTab;
+        GraphView.IsVisible = false;
+        FileView.IsVisible = true;
+        FileOpenGraphButton.IsVisible = kind == ProjectFileKind.Generated && workspace.Project.GraphForGeneratedPath(fullPath) is not null;
+        ShowFileDocument(fullPath);
+        UpdateFileBanner();
+        UpdateFileStatus();
         if (line is { } target && target <= document.LineCount)
         {
             DocumentLine documentLine = document.GetLineByNumber(target);
-            CodeEditor.CaretOffset = documentLine.Offset + Math.Min(Math.Max(column - 1, 0), documentLine.Length);
-            CodeEditor.ScrollToLine(target);
+            FileEditor.CaretOffset = documentLine.Offset + Math.Min(Math.Max(column - 1, 0), documentLine.Length);
+            Dispatcher.UIThread.Post(() => FileEditor.ScrollToLine(target), DispatcherPriority.Background);
         }
 
-        CodeEditor.Focus();
+        Dispatcher.UIThread.Post(() => FileEditor.Focus(), DispatcherPriority.Background);
+        RevealInExplorer(fullPath, focus: false);
         RefreshProjectPanel();
+        UpdateTitle();
+        UpdateCommandStates();
     }
 
     private void UpdateCodeBanner()
     {
-        ShowGeneratedButton.IsVisible = shownFile is not null;
-        if (shownFile is not null && workspace is not null)
+        CodeBanner.Text = workspace?.LastCompilation.Source is { } source
+            ? $"Generated/{source.RelativePath} — generated from {workspace.Graph.Graph.Name}, read-only. Edit the graph to change it; put handwritten C# in separate .cs files."
+            : "The graph has errors, so no code is generated. See Problems.";
+    }
+
+    private void UpdateFileBanner()
+    {
+        if (shownFile is null || workspace is null)
         {
-            string name = Path.GetRelativePath(workspace.Project.DirectoryPath, shownFile);
-            CodeBanner.Text = $"{name}{(workspace.IsCodeFileDirty(shownFile) ? " •" : "")} — handwritten C#, saved with the project (Ctrl+S). F12 goes to a definition.";
+            return;
         }
-        else if (workspace?.LastCompilation.Source is { } source)
+
+        string name = Path.GetRelativePath(workspace.Project.DirectoryPath, shownFile);
+        string dirty = workspace.IsCodeFileDirty(shownFile) ? " •" : "";
+        FileBanner.Text = ProjectFiles.KindOf(workspace.Project, shownFile) switch
         {
-            CodeBanner.Text = $"Generated/{source.RelativePath} — read-only. Edit the graph to change it; put handwritten C# in separate .cs files.";
+            ProjectFileKind.Generated => $"{name} — generated from a graph, read-only. Edit the graph to change it.",
+            ProjectFileKind.ProjectFile => $"{name} — the project file, read-only. The IDE keeps it up to date.",
+            ProjectFileKind.CSharp => $"{name}{dirty} — handwritten C#, compiled with the generated code and checked as you type. Ctrl+S saves.",
+            _ when string.Equals(shownFile, workspace.Project.CsprojPath, StringComparison.OrdinalIgnoreCase)
+                => $"{name}{dirty} — the MSBuild project. Packages and references you add here become nodes once restored. Ctrl+S saves.",
+            _ => $"{name}{dirty} — Ctrl+S saves.",
+        };
+    }
+
+    private void UpdateFileStatus()
+    {
+        if (shownFile is not null)
+        {
+            AvaloniaEdit.Editing.Caret caret = FileEditor.TextArea.Caret;
+            FileStatus.Text = $"Ln {caret.Line}, Col {caret.Column}   ·   {FileEditor.Document.LineCount} lines   ·   {LanguageOf(shownFile)}"
+                + (FileEditor.IsReadOnly ? "   ·   read-only" : "");
+        }
+    }
+
+    private static string LanguageOf(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".cs" => "C#",
+        ".csproj" or ".props" or ".targets" => "MSBuild",
+        ".sln" => "Solution",
+        ".slnx" or ".xml" or ".axaml" or ".xaml" or ".resx" or ".config" => "XML",
+        ".json" or ".vside" => "JSON",
+        ".md" => "Markdown",
+        _ => "Plain text",
+    };
+
+    // AvaloniaEdit's definition for the file's language, recolored for the dark theme; project files are XML.
+    private static IHighlightingDefinition? HighlightingFor(string path)
+    {
+        string extension = Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".csproj" or ".props" or ".targets" or ".slnx" or ".axaml" or ".xaml" or ".resx" or ".config" => ".xml",
+            ".vside" => ".json",
+            var other => other,
+        };
+        return HighlightingManager.Instance.GetDefinitionByExtension(extension) is { } definition ? Recolored(definition) : null;
+    }
+
+    private void OnOpenFileGraph(object? sender, RoutedEventArgs e)
+    {
+        if (workspace is not null && shownFile is not null && workspace.Project.GraphForGeneratedPath(shownFile) is { } graph)
+        {
+            OpenProjectGraph(graph);
+        }
+    }
+
+    private void OnFindInFile(object? sender, RoutedEventArgs e)
+    {
+        if (FileEditor.TextArea.GetService(typeof(SearchPanel)) is SearchPanel panel)
+        {
+            panel.Open();
         }
         else
         {
-            CodeBanner.Text = "The graph has errors, so no code is generated. See Problems.";
+            FileEditor.Focus();
+        }
+    }
+
+    private void OnOpenFileInCode(object? sender, RoutedEventArgs e)
+    {
+        if (workspace is not null && shownFile is not null)
+        {
+            OpenInCode(shownFile, FileEditor.TextArea.Caret.Line);
+        }
+    }
+
+    private void OnRevealFile(object? sender, RoutedEventArgs e)
+    {
+        if (shownFile is not null)
+        {
+            RevealInExplorer(shownFile, focus: true);
         }
     }
 
@@ -162,13 +269,12 @@ public partial class MainWindow
 
         if (workspace.Project.GraphForGeneratedPath(path) is { } graph)
         {
-            if (graph != workspace.Graph)
+            if (graph != workspace.Graph || shownFile is not null)
             {
                 OpenProjectGraph(graph);
             }
 
             ShowGeneratedCode();
-            BottomTabs.SelectedItem = CodeTab;
             if (diagnostic.Line is { } line && line <= generatedDocument.LineCount)
             {
                 CodeEditor.ScrollToLine(line);
@@ -182,9 +288,13 @@ public partial class MainWindow
 
     private async void OnGoToDefinition(object? sender, RoutedEventArgs e)
     {
-        if (CodeEditor.IsKeyboardFocusWithin)
+        if (FileEditor.IsKeyboardFocusWithin && shownFile is not null)
         {
-            await GoToCodeDefinitionAsync();
+            await GoToCodeDefinitionAsync(shownFile, FileEditor.CaretOffset);
+        }
+        else if (CodeEditor.IsKeyboardFocusWithin && workspace is not null)
+        {
+            await GoToCodeDefinitionAsync(workspace.Project.GeneratedPath(workspace.Graph.Graph), CodeEditor.CaretOffset);
         }
         else
         {
@@ -217,7 +327,7 @@ public partial class MainWindow
 
         if (target.VariableId is { } variable)
         {
-            LeftTabs.SelectedIndex = 0;
+            LeftTabs.SelectedItem = MyProjectTab;
             SelectVariable(variable);
             SetStatus($"Variable {workspace.Editor.Graph.FindVariable(variable)?.Name} is shown in Details.");
         }
@@ -227,19 +337,23 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Opens the declaration of the symbol under the caret: a node of a graph, a handwritten file, or a message for .NET symbols.</summary>
-    private async Task GoToCodeDefinitionAsync()
+    /// <summary>Opens the declaration of the symbol at <paramref name="offset"/> in <paramref name="path"/>: a node of a graph, a handwritten file, or a message for .NET symbols.</summary>
+    private async Task GoToCodeDefinitionAsync(string path, int offset)
     {
         if (workspace is null)
         {
             return;
         }
 
+        if (!path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus("Go to Definition works in C# files.");
+            return;
+        }
+
         VisualProject project = workspace.Project;
         VisualProject snapshot = workspace.Snapshot();
         GraphCompiler compiler = workspace.Compiler;
-        string path = shownFile ?? project.GeneratedPath(workspace.Graph.Graph);
-        int offset = CodeEditor.CaretOffset;
         IReadOnlyDictionary<string, string> unsaved = workspace.UnsavedFiles;
         SetStatus("Finding the definition…");
         ProjectDefinition? definition;
@@ -271,19 +385,22 @@ public partial class MainWindow
                 return;
             }
 
-            if (graph != workspace.Graph)
+            if (graph != workspace.Graph || shownFile is not null)
             {
                 OpenProjectGraph(graph);
             }
 
-            ShowGeneratedCode();
             if (definition.NodeId is { } nodeId)
             {
                 GraphCanvas.Select(nodeId, frame: true);
             }
-            else if (definition.Line <= generatedDocument.LineCount)
+            else
             {
-                CodeEditor.ScrollToLine(definition.Line);
+                ShowGeneratedCode();
+                if (definition.Line <= generatedDocument.LineCount)
+                {
+                    CodeEditor.ScrollToLine(definition.Line);
+                }
             }
 
             SetStatus($"{definition.SymbolName} is defined in {graph.Graph.Name}.");
@@ -297,5 +414,16 @@ public partial class MainWindow
         {
             SetStatus($"{definition.SymbolName} is defined in a referenced assembly, which has no source in this project.");
         }
+    }
+
+    /// <summary>AvaloniaEdit's built-in definitions, recolored for the current theme (their defaults target light backgrounds).</summary>
+    private static IHighlightingDefinition Recolored(IHighlightingDefinition definition)
+    {
+        foreach (HighlightingColor color in definition.NamedHighlightingColors)
+        {
+            color.Foreground = new SimpleHighlightingBrush(Color.Parse(IdeColors.SyntaxColor(color.Name, Canvas.CanvasTheme.IsLight)));
+        }
+
+        return definition;
     }
 }

@@ -35,9 +35,10 @@ public sealed class GraphDocument
     /// <summary>
     /// Version 2 added <see cref="Comments"/>; version 3 added <see cref="GraphConnection.Points"/>; version 4 added <see cref="Variables"/>;
     /// version 5 added <see cref="Parameters"/> and <see cref="ReturnType"/>; version 6 added <see cref="Properties"/>; version 7
-    /// added <see cref="Owner"/>; version 8 added <see cref="GraphKind.Constructor"/> graphs and <see cref="TypeParameters"/>.
+    /// added <see cref="Owner"/>; version 8 added <see cref="GraphKind.Constructor"/> graphs and <see cref="TypeParameters"/>; version 9
+    /// added <see cref="BaseType"/>, <see cref="GraphProperty.Export"/>, and <see cref="Signals"/>.
     /// </summary>
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
@@ -80,6 +81,18 @@ public sealed class GraphDocument
     /// </summary>
     public List<string> TypeParameters { get; init; } = [];
 
+    /// <summary>
+    /// For a <see cref="GraphKind.Class"/> graph, the full name of the .NET class it derives from, such as <c>Godot.CharacterBody2D</c>;
+    /// null for none. Its methods named like a virtual method of that class override it.
+    /// </summary>
+    public string? BaseType { get; set; }
+
+    /// <summary>
+    /// Godot signals a <see cref="GraphKind.Class"/> graph deriving from a Godot class declares, in declaration order (D-051). Each
+    /// generates a <c>[Signal]</c> delegate; Emit and On nodes refer to it by id.
+    /// </summary>
+    public List<GraphSignal> Signals { get; init; } = [];
+
     public GraphNode? FindNode(string nodeId) => Nodes.Find(node => node.Id == nodeId);
 
     public GraphVariable? FindVariable(string variableId) => Variables.Find(variable => variable.Id == variableId);
@@ -101,6 +114,7 @@ public sealed class GraphDocument
         Kind = Kind,
         ReturnType = ReturnType,
         Owner = Owner,
+        BaseType = BaseType,
         Nodes = [.. Nodes.Select(node => new GraphNode
         {
             Id = node.Id,
@@ -113,8 +127,14 @@ public sealed class GraphDocument
         Comments = [.. Comments.Select(comment => new GraphComment { Id = comment.Id, X = comment.X, Y = comment.Y, Width = comment.Width, Height = comment.Height, Text = comment.Text })],
         Variables = [.. Variables.Select(variable => new GraphVariable { Id = variable.Id, Name = variable.Name, Type = variable.Type, Value = variable.Value })],
         Parameters = [.. Parameters.Select(parameter => new GraphParameter { Id = parameter.Id, Name = parameter.Name, Type = parameter.Type })],
-        Properties = [.. Properties.Select(property => new GraphProperty { Id = property.Id, Name = property.Name, Type = property.Type, Value = property.Value })],
+        Properties = [.. Properties.Select(property => new GraphProperty { Id = property.Id, Name = property.Name, Type = property.Type, Value = property.Value, Export = property.Export })],
         TypeParameters = [.. TypeParameters],
+        Signals = [.. Signals.Select(signal => new GraphSignal
+        {
+            Id = signal.Id,
+            Name = signal.Name,
+            Parameters = [.. signal.Parameters.Select(parameter => new GraphParameter { Id = parameter.Id, Name = parameter.Name, Type = parameter.Type })],
+        })],
     };
 
     public static GraphDocument CreateEmpty(string name, GraphKind kind) => new()
@@ -213,6 +233,25 @@ public sealed class GraphProperty
 
     /// <summary>Initial value, as literal text in the invariant culture; blank for lists, classes, and structs.</summary>
     public string Value { get; set; } = "";
+
+    /// <summary>
+    /// True when the property is generated with Godot's <c>[Export]</c>, so the Godot editor shows and saves it per node. Only for
+    /// classes deriving from a Godot class (D-047). Not written when false.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Export { get; set; }
+}
+
+/// <summary>A Godot signal of a class: <c>[Signal] public delegate void {Name}EventHandler(parameters)</c>.</summary>
+public sealed class GraphSignal
+{
+    public required string Id { get; init; }
+
+    /// <summary>The signal's name, such as <c>Hit</c>. Must be a valid C# identifier, unique in the class.</summary>
+    public required string Name { get; set; }
+
+    /// <summary>The values the signal carries; their ids name the pins of Emit and On nodes.</summary>
+    public List<GraphParameter> Parameters { get; init; } = [];
 }
 
 /// <summary>Identifies one pin on one node.</summary>

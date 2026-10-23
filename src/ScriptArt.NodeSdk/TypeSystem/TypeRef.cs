@@ -27,6 +27,12 @@ public sealed record TypeRef(string Namespace, string Name, string? Keyword = nu
     public static readonly TypeRef InvalidOperationException = new("System", "InvalidOperationException");
     public static readonly TypeRef Task = new("System.Threading.Tasks", "Task");
 
+    /// <summary>
+    /// Any class: the type of inputs that take an object of every class, such as Cast To's. Values of classes connect to it as they
+    /// are. It has no keyword, so a value is never converted to <c>object</c> on the way in.
+    /// </summary>
+    public static readonly TypeRef Object = new("System", "Object");
+
     private const string CollectionsNamespace = "System.Collections.Generic";
 
     public IReadOnlyList<TypeRef> Arguments { get; init; } = Arguments ?? [];

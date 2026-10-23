@@ -68,4 +68,5 @@ public static class DiagnosticIds
     public const string UnknownType = "VSG0029";
     public const string InvalidType = "VSG0030";
     public const string RethrowOutsideCatch = "VSG0031";
+    public const string SourceGeneratorNotRun = "VSG0032";
 }

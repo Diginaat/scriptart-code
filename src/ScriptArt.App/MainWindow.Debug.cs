@@ -42,13 +42,20 @@ public partial class MainWindow
             return;
         }
 
-        if (DebuggerLocator.Find() is not { } debugger)
+        if (DebuggerLocator.Find(preferences.DebuggerPath) is not { } debugger)
         {
             BottomTabs.SelectedItem = OutputTab;
             AppendOutput($"Debugging needs netcoredbg, the open-source .NET debugger. Install it from https://github.com/Samsung/netcoredbg/releases and put it on PATH, "
                 + $"in {Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ScriptArtCode", "netcoredbg")}, "
-                + $"or set {DebuggerLocator.PathVariable} to its path. Ctrl+F5 runs without debugging.");
+                + $"set its path in Tools → Preferences, or set {DebuggerLocator.PathVariable}. Ctrl+F5 runs without debugging.");
             SetStatus("netcoredbg was not found. See Output.");
+            return;
+        }
+
+        bool isGodot = workspace.Project.IsGodotProject;
+        if (isGodot && preferences.GodotPath is null)
+        {
+            SetStatus("Choose the Godot 4 .NET executable in Tools → Preferences to debug Godot projects.");
             return;
         }
 
@@ -64,14 +71,21 @@ public partial class MainWindow
             AppendOutput($"A breakpoint on node {breakpoint.NodeId} is not hit: the node generates no statement of its own.");
         }
 
-        string program = project.OutputAssemblyPath(Configuration);
+        string program = isGodot ? $"{preferences.GodotPath} --path {project.DirectoryPath}" : project.OutputAssemblyPath(Configuration);
         AppendOutput($"> debugging {program} with {debugger}");
+        if (isGodot)
+        {
+            AppendOutput("The debugger attaches once Godot has started .NET, so breakpoints in the first scene's _Ready may not stop.");
+        }
+
         SetBusy(true, "Starting the debugger…");
         DebugSession session;
         try
         {
-            session = await DebugSession.StartAsync(debugger, program, map.Lines(workspace.Breakpoints),
-                line => Dispatcher.UIThread.Post(() => AppendOutput(line)), CancellationToken.None);
+            void Output(string line) => Dispatcher.UIThread.Post(() => AppendOutput(line));
+            session = isGodot
+                ? await DebugSession.StartGodotAsync(debugger, preferences.GodotPath!, project.DirectoryPath, map.Lines(workspace.Breakpoints), Output, CancellationToken.None)
+                : await DebugSession.StartAsync(debugger, program, map.Lines(workspace.Breakpoints), Output, CancellationToken.None);
         }
         catch (Exception exception) when (exception is InvalidOperationException or DebugAdapterException or TimeoutException or IOException or UnauthorizedAccessException)
         {

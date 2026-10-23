@@ -72,6 +72,7 @@ If any stage reports an error, no C# is produced and nothing is written.
 | VSG0029 | Type node for a class, struct, or property that does not exist, Set on a struct or With on a class, or a list or dictionary node whose collection type is not supported |
 | VSG0030 | Invalid class or struct: name, nodes in a type graph, type parameter, property name, type, or initial value, or a type that contains itself |
 | VSG0031 | Rethrow outside a Catch block |
+| VSG0032 | Warning: an approved source generator could not be loaded or no longer matches its approved hash; verification runs without it (D-050) |
 | VSP0001 | Generated file target exists and is handwritten |
 | CSxxxx | Roslyn diagnostic, passed through |
 

@@ -95,6 +95,7 @@ internal static class Program
 | ✍️ **Code where you want it** | Handwritten `.cs` files beside your graphs, checked as you type |
 | 🐞 **Debugging on the canvas** | Breakpoints on nodes (F9), step through (F10/F11), see the call stack and variables |
 | 🔍 **Find your way** | Go to Definition (F12), command palette (Ctrl+Shift+P), node search that understands everyday words and typos |
+| 🎮 **Godot 4** | Godot C# scripts as graphs: derive a class from a Godot node type, override `_Ready` or `_PhysicsProcess`, export properties to the Godot editor, handle and emit signals, test input classes with Cast To, call GodotSharp as nodes, and run or debug the game with F5 (File → New Godot Project) |
 | 🔌 **Extensible** | Node libraries from others, loaded only after you approve them ([how to write one](docs/NODE_AUTHORING.md)) |
 | 🤖 **Scriptable** | `vside generate`, `diff`, `build`, `run`, and `migrate` for scripts and CI |
 
@@ -159,6 +160,7 @@ This produces the self-contained IDE per runtime, the `vside` CLI as a .NET tool
 | Classes and structs | **+** next to Classes or Structs; add properties in Details. New, Get, and Set (class) or With (struct) nodes appear under Types |
 | Methods | **Add Method** in a class's or struct's Details; use its **Self** node inside the method and its Call node, with a Target, elsewhere |
 | Lists and dictionaries | Choose a type such as `List<Point>` or `Dictionary<string, int>` for a variable, parameter, or property; its nodes appear under Lists or Dictionaries |
+| Godot scripts | File → New Godot Project, or set **Base class** in a class's Details to a Godot node type such as `Godot.CharacterBody2D`; **Override Method** adds `_Ready`, `_Process`, and the other virtual methods. **Export to Godot** on a property shows it in Godot's inspector. **+ Add Signal** declares a signal (Emit and On nodes under Signals); built-in signals are `On Button.Pressed` and similar nodes. Cast To (Casting) tells input events apart in `_Input`. Project → Approve Source Generators… lets Godot's generators run when code is checked. Restore the packages when asked, generate (F6), then attach `Generated/{Class}.cs` to a node in Godot. F5 runs the game once the Godot executable is chosen in Preferences. See `samples/GodotMover` |
 | Constructors and generic types | **Add Constructor** in a class's or struct's Details, then choose it on a New node; **Type parameters** (such as `T`) make the type generic |
 | Command palette | Ctrl+Shift+P: search every menu command and node by name; Enter runs the first match |
 | Frame graph | Home |
@@ -169,12 +171,15 @@ This produces the self-contained IDE per runtime, the `vside` CLI as a .NET tool
 | Reroute a wire | Double-click a wire to add a point (keep holding to drag it); drag a point to move it; Alt+click it to remove it |
 | Cut, copy, paste, duplicate | Ctrl+X, Ctrl+C, Ctrl+V (at the pointer), Ctrl+D |
 | Delete, undo, redo, save | Delete, Ctrl+Z, Ctrl+Y, Ctrl+S |
-| Handwritten C# | My Project → Files: click a file to edit it in the Code tab; Project → Add C# File. Saved with Ctrl+S |
+| Files | Files tab (Ctrl+Shift+E), for reference: the solution and the project folder. Its + button adds graphs first, then C# and other files. Double-click a file to open it in a tab; right-click to create, rename, or delete; Ctrl+P opens a file by name, Ctrl+W closes a tab, Ctrl+Tab switches. Tools → Open Folder in VS Code |
+| Handwritten C# | Open a `.cs` file from Files or My Project → Files; Project → Add C# File. Checked as you type, saved with Ctrl+S |
 | Go to definition | F12 on a selected node or on a name in the code |
 | Generate (with preview), build | F6, Ctrl+Shift+B. Build → Preview Changes Before Generating turns the diff preview on or off |
 | Debug, run, stop | F5 (debug), Ctrl+F5 (run without debugging), Shift+F5 |
-| Breakpoints and stepping | F9 on a node; while paused F5 continues, F10 steps over, F11 steps into, Shift+F11 steps out. Needs [netcoredbg](https://github.com/Samsung/netcoredbg/releases) on PATH or in `VSIDE_NETCOREDBG` |
-| Packages, references, solution | Project menu, or **+** next to References in My Project |
+| Breakpoints and stepping | F9 on a node; while paused F5 continues, F10 steps over, F11 steps into, Shift+F11 steps out. Needs [netcoredbg](https://github.com/Samsung/netcoredbg/releases) on PATH, in Tools → Preferences, or in `VSIDE_NETCOREDBG` |
+| Preferences and recent projects | Tools → Preferences (Ctrl+,): autosave interval, preview before generating, netcoredbg path, Godot executable, theme (dark, light, system), UI scale. File → Open Recent |
+| Autosave and recovery | Unsaved work is copied to a recovery folder every minute (never over your files); after a crash, reopening the project offers to restore it |
+| Packages, references, solution | Project menu, **+** next to References in My Project, or **+** next to Solution in the Explorer (new or existing projects) |
 
 </details>
 

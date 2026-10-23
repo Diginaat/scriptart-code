@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using ScriptArt.Compiler.Diagnostics;
@@ -32,14 +33,41 @@ public static class RoslynVerifier
     internal static IReadOnlyList<MetadataReference> RuntimeReferences => RuntimeReferenceList.Value;
 
     /// <param name="referencePaths">Assemblies the project references besides the framework, such as NuGet package assemblies.</param>
+    /// <param name="generators">
+    /// Source generators the user approved, run before checking so that code using what they generate (Godot's <c>SignalName</c>)
+    /// compiles as in a build. Their own errors are reported too. A generator that cannot be run is reported as a warning.
+    /// </param>
     public static IReadOnlyList<GraphDiagnostic> Verify(string assemblyName, IReadOnlyList<VerificationSource> sources, bool isExecutable,
-        IReadOnlyList<string>? referencePaths = null)
+        IReadOnlyList<string>? referencePaths = null, SourceGeneratorSet? generators = null)
     {
         ArgumentNullException.ThrowIfNull(sources);
         CSharpCompilation compilation = CreateCompilation(assemblyName, sources, isExecutable, referencePaths);
 
         List<GraphDiagnostic> results = [];
-        foreach (Diagnostic diagnostic in compilation.GetDiagnostics())
+        IEnumerable<Diagnostic> generatorDiagnostics = [];
+        if (generators is { Assemblies.Count: > 0 })
+        {
+            List<ISourceGenerator> loaded = [];
+            foreach (SourceGeneratorAssembly assembly in generators.Assemblies)
+            {
+                if (SourceGeneratorLoader.TryLoad(assembly, out var found, out string? problem))
+                {
+                    loaded.AddRange(found);
+                }
+                else
+                {
+                    results.Add(new GraphDiagnostic(DiagnosticIds.SourceGeneratorNotRun, GraphSeverity.Warning, problem, null, null));
+                }
+            }
+
+            GeneratorDriver driver = CSharpGeneratorDriver.Create(loaded, parseOptions: compilation.SyntaxTrees.FirstOrDefault()?.Options as CSharpParseOptions,
+                optionsProvider: new BuildPropertyOptionsProvider(generators.BuildProperties));
+            driver.RunGeneratorsAndUpdateCompilation(compilation, out Compilation generated, out ImmutableArray<Diagnostic> produced);
+            compilation = (CSharpCompilation)generated;
+            generatorDiagnostics = produced;
+        }
+
+        foreach (Diagnostic diagnostic in generatorDiagnostics.Concat(compilation.GetDiagnostics()))
         {
             if (diagnostic.Severity is not (RoslynSeverity.Error or RoslynSeverity.Warning) || diagnostic.IsSuppressed)
             {

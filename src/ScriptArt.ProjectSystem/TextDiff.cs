@@ -58,6 +58,90 @@ public static class TextDiff
     }
 
     /// <summary>
+    /// Merges two edits of <paramref name="baseText"/> line by line: changes to different lines are combined, and the same change
+    /// on both sides is taken once. Returns null when the sides change the same or adjacent lines differently (a conflict).
+    /// The result ends with a line break when <paramref name="theirs"/> does.
+    /// </summary>
+    public static string? Merge(string baseText, string ours, string theirs)
+    {
+        ArgumentNullException.ThrowIfNull(baseText);
+        ArgumentNullException.ThrowIfNull(ours);
+        ArgumentNullException.ThrowIfNull(theirs);
+        string[] lines = SplitLines(baseText);
+        List<Hunk> hunks = [.. Hunks(baseText, ours), .. Hunks(baseText, theirs)];
+        hunks.Sort((a, b) => a.Start != b.Start ? a.Start.CompareTo(b.Start) : a.End.CompareTo(b.End));
+
+        List<string> merged = [];
+        int position = 0;
+        Hunk? previous = null;
+        foreach (Hunk hunk in hunks)
+        {
+            if (previous is { } last && hunk.Start <= last.End)
+            {
+                // Touching or overlapping changes from the two sides merge only when they are the same change.
+                if (hunk.Start == last.Start && hunk.End == last.End && hunk.Lines.SequenceEqual(last.Lines))
+                {
+                    continue;
+                }
+
+                return null;
+            }
+
+            merged.AddRange(lines[position..hunk.Start]);
+            merged.AddRange(hunk.Lines);
+            position = hunk.End;
+            previous = hunk;
+        }
+
+        merged.AddRange(lines[position..]);
+        string text = string.Join('\n', merged);
+        return theirs.EndsWith('\n') && merged.Count > 0 ? text + "\n" : text;
+    }
+
+    // The changed regions of newText: base lines [Start, End) replaced by Lines.
+    private sealed record Hunk(int Start, int End, IReadOnlyList<string> Lines);
+
+    private static List<Hunk> Hunks(string baseText, string newText)
+    {
+        List<Hunk> hunks = [];
+        int basePosition = 0;
+        int? start = null;
+        List<string> added = [];
+        foreach (DiffLine line in Lines(baseText, newText))
+        {
+            if (line.Kind == DiffKind.Same)
+            {
+                if (start is { } begin)
+                {
+                    hunks.Add(new Hunk(begin, basePosition, added));
+                    start = null;
+                    added = [];
+                }
+
+                basePosition++;
+                continue;
+            }
+
+            start ??= basePosition;
+            if (line.Kind == DiffKind.Removed)
+            {
+                basePosition++;
+            }
+            else
+            {
+                added.Add(line.Text);
+            }
+        }
+
+        if (start is { } end)
+        {
+            hunks.Add(new Hunk(end, basePosition, added));
+        }
+
+        return hunks;
+    }
+
+    /// <summary>
     /// A unified diff (<c>---</c>/<c>+++</c> headers and <c>@@</c> hunks with <paramref name="context"/> lines around each change), as
     /// <c>git diff</c> prints it. Empty when the texts have the same lines.
     /// </summary>

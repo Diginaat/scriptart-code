@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 9,
+  "id": "player",
+  "name": "Player",
+  "kind": "Class",
+  "nodes": [],
+  "connections": [],
+  "comments": [],
+  "variables": [],
+  "parameters": [],
+  "properties": [
+    {
+      "id": "speed",
+      "name": "Speed",
+      "type": "double",
+      "value": "300",
+      "export": true
+    }
+  ],
+  "typeParameters": [],
+  "baseType": "Godot.CharacterBody2D"
+}

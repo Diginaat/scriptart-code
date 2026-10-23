@@ -17,7 +17,11 @@ public readonly record struct ConnectionCheck(string? ErrorId, string? Error)
 /// </summary>
 public static class ConnectionRules
 {
-    public static ConnectionCheck Check(PinDefinition from, PinDefinition to)
+    /// <param name="baseTypesOf">
+    /// The classes a type derives from (<see cref="NodeLibrary.BaseTypesOf"/>); a value then also connects to inputs of those. Without
+    /// it, only the conversions of <see cref="TypeConversions"/> apply.
+    /// </param>
+    public static ConnectionCheck Check(PinDefinition from, PinDefinition to, Func<TypeRef, IReadOnlyList<TypeRef>>? baseTypesOf = null)
     {
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(to);
@@ -33,7 +37,8 @@ public static class ConnectionRules
         }
 
         if (from.DataType is { } sourceType && to.DataType is { } targetType
-            && !TypeConversions.IsImplicitlyConvertible(sourceType, targetType))
+            && !TypeConversions.IsImplicitlyConvertible(sourceType, targetType)
+            && baseTypesOf?.Invoke(sourceType).Contains(targetType) != true)
         {
             return new(DiagnosticIds.TypeMismatch, $"Cannot connect {sourceType} to {targetType}. Add a conversion node.");
         }

@@ -27,6 +27,7 @@ public static class GraphSerializer
         new(6, "adds classes and structs with properties", root => root["properties"] = new JsonArray()),
         new(7, "allows methods owned by a class or struct; existing functions stay in the program class", _ => { }),
         new(8, "adds constructors and type parameters", root => root["typeParameters"] = new JsonArray()),
+        new(9, "allows a class to derive from a .NET class, to export properties to Godot, and to declare Godot signals; existing classes derive from none", _ => { }),
     ];
 
     public static string Serialize(GraphDocument graph)
@@ -49,9 +50,14 @@ public static class GraphSerializer
         root["schemaVersion"] = GraphDocument.CurrentSchemaVersion;
 
         // An absent list means an empty one. Without this, the generated deserializer would set the list to null.
-        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters", "properties", "typeParameters"])
+        foreach (string list in (string[])["nodes", "connections", "comments", "variables", "parameters", "properties", "typeParameters", "signals"])
         {
             root[list] ??= new JsonArray();
+        }
+
+        foreach (JsonObject signal in (root["signals"] as JsonArray ?? []).OfType<JsonObject>())
+        {
+            signal["parameters"] ??= new JsonArray();
         }
 
         GraphDocument? graph;

@@ -71,6 +71,9 @@ public sealed partial class GraphEditor
         return Library.Resolve(node, Graph, ProjectGraphs);
     }
 
+    // A value connects to inputs of the classes its type derives from.
+    private IReadOnlyList<TypeRef> BaseTypesOf(TypeRef type) => Library.AssignableTypesOf(type, ProjectGraphs);
+
     /// <summary>Every node that can be added to this graph, including variable nodes, a call node per function, and type nodes.</summary>
     public IEnumerable<NodeDefinition> AvailableDefinitions => Library.DefinitionsFor(Graph, ProjectGraphs);
 
@@ -100,8 +103,8 @@ public sealed partial class GraphEditor
         }
 
         return definition.Pins.FirstOrDefault(pin => sourcePin.Direction == PinDirection.Output
-            ? ConnectionRules.Check(sourcePin, pin).IsAllowed
-            : ConnectionRules.Check(pin, sourcePin).IsAllowed);
+            ? ConnectionRules.Check(sourcePin, pin, BaseTypesOf).IsAllowed
+            : ConnectionRules.Check(pin, sourcePin, BaseTypesOf).IsAllowed);
     }
 
     /// <summary>
@@ -406,7 +409,7 @@ public sealed partial class GraphEditor
             ? (first, a, second, b)
             : (second, b, first, a);
 
-        ConnectionCheck check = ConnectionRules.Check(from, to);
+        ConnectionCheck check = ConnectionRules.Check(from, to, BaseTypesOf);
         if (check.IsAllowed)
         {
             connection = new GraphConnection(fromRef, toRef);

@@ -68,7 +68,7 @@ public static class DotNetCli
     }
 }
 
-/// <summary>A running <c>dotnet</c> process whose output is forwarded line by line.</summary>
+/// <summary>A running <c>dotnet</c> process, or a Godot game, whose output is forwarded line by line.</summary>
 public sealed class DotNetProcess : IDisposable
 {
     private readonly Process process;
@@ -81,12 +81,47 @@ public sealed class DotNetProcess : IDisposable
     /// <param name="environment">Variables to set for the process, on top of the IDE's own environment.</param>
     public static DotNetProcess Start(IEnumerable<string> arguments, Action<string> output, IReadOnlyDictionary<string, string>? environment = null)
     {
-        ArgumentNullException.ThrowIfNull(output);
-        var process = new Process { StartInfo = DotNetCli.CreateStartInfo(arguments), EnableRaisingEvents = true };
+        ProcessStartInfo startInfo = DotNetCli.CreateStartInfo(arguments);
         foreach ((string name, string value) in environment ?? new Dictionary<string, string>())
         {
-            process.StartInfo.Environment[name] = value;
+            startInfo.Environment[name] = value;
         }
+
+        return Start(startInfo, output, "The .NET SDK ('dotnet') was not found. Install the .NET 10 SDK and make sure it is on PATH.");
+    }
+
+    /// <summary>
+    /// Runs the Godot project in <paramref name="projectDirectory"/> (the folder of <c>project.godot</c>) with the Godot 4 .NET
+    /// executable at <paramref name="godotPath"/>, which starts its main scene. Build the project first: Godot loads the assembly
+    /// <c>dotnet build</c> writes under <c>.godot/mono/temp/bin</c>.
+    /// </summary>
+    /// <param name="arguments">More of Godot's command-line options, such as <c>--headless</c>.</param>
+    public static DotNetProcess StartGodot(string godotPath, string projectDirectory, Action<string> output, IEnumerable<string>? arguments = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(godotPath);
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+        var startInfo = new ProcessStartInfo(godotPath)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = projectDirectory,
+        };
+        startInfo.ArgumentList.Add("--path");
+        startInfo.ArgumentList.Add(projectDirectory);
+        foreach (string argument in arguments ?? [])
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+        return Start(startInfo, output, $"Godot could not be started from '{godotPath}'. Choose the Godot 4 .NET executable in Tools → Preferences.");
+    }
+
+    private static DotNetProcess Start(ProcessStartInfo startInfo, Action<string> output, string notFound)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
 
         process.OutputDataReceived += (_, e) =>
         {
@@ -110,7 +145,7 @@ public sealed class DotNetProcess : IDisposable
         catch (System.ComponentModel.Win32Exception exception)
         {
             process.Dispose();
-            throw new InvalidOperationException("The .NET SDK ('dotnet') was not found. Install the .NET 10 SDK and make sure it is on PATH.", exception);
+            throw new InvalidOperationException(notFound, exception);
         }
 
         process.BeginOutputReadLine();

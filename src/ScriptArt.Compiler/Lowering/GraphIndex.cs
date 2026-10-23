@@ -83,7 +83,7 @@ public sealed class GraphIndex
                 continue;
             }
 
-            index.AddConnection(connection, diagnostics);
+            index.AddConnection(connection, library, diagnostics);
         }
 
         return index;
@@ -131,10 +131,25 @@ public sealed class GraphIndex
             return;
         }
 
+        if (definition is null && SignalNodes.IsSignalNode(node.Type))
+        {
+            diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
+                "This node refers to a signal that is no longer in its class, or whose values have an unsupported type.", Graph.Id, node.Id));
+            return;
+        }
+
+        if (definition is null && node.Type == TypeNodes.CastTypeId)
+        {
+            diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
+                $"Cast To needs a class: one of the project, or the full name of a .NET class such as Godot.InputEventKey. '{node.Properties.GetValueOrDefault(TypeNodes.CastProperty)}' is not one.",
+                Graph.Id, node.Id));
+            return;
+        }
+
         if (definition is null && library.IsGenericMethod(node.Type))
         {
             diagnostics.Add(new(DiagnosticIds.UnknownType, DiagnosticSeverity.Error,
-                "This node's Type Arguments are not types the method can use. Write one type per type parameter, such as int.", Graph.Id, node.Id));
+                "This node's Type Arguments are not types the method can use. Write one type per type parameter, such as int, or a class, such as Godot.Label, where the method requires one.", Graph.Id, node.Id));
             return;
         }
 
@@ -158,7 +173,7 @@ public sealed class GraphIndex
         nodes.Add(node.Id, new ResolvedNode(node, definition));
     }
 
-    private void AddConnection(GraphConnection connection, List<GraphDiagnostic> diagnostics)
+    private void AddConnection(GraphConnection connection, NodeLibrary library, List<GraphDiagnostic> diagnostics)
     {
         PinDefinition? from = FindPin(connection.From);
         PinDefinition? to = FindPin(connection.To);
@@ -180,7 +195,7 @@ public sealed class GraphIndex
             return;
         }
 
-        ConnectionCheck check = ConnectionRules.Check(from, to);
+        ConnectionCheck check = ConnectionRules.Check(from, to, type => library.AssignableTypesOf(type, ProjectGraphs));
         if (!check.IsAllowed)
         {
             diagnostics.Add(new(check.ErrorId!, DiagnosticSeverity.Error, check.Error!, Graph.Id, connection.To.Node, connection.To));

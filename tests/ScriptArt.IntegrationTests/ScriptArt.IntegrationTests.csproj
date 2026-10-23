@@ -14,8 +14,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ScriptArt.ProjectSystem\ScriptArt.ProjectSystem.csproj" />
+    <ProjectReference Include="..\..\src\ScriptArt.NodeEditor\ScriptArt.NodeEditor.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\samples\**\*.vside;..\..\samples\**\*.graph.json" LinkBase="samples" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Godot sample's .csproj names Godot.NET.Sdk, which the IDE does not write for a missing project file. -->
+    <None Include="..\..\samples\GodotMover\GodotMover.csproj;..\..\samples\GodotMover\project.godot;..\..\samples\GodotMover\Main.tscn" LinkBase="samples\GodotMover" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

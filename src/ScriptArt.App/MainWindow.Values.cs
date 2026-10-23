@@ -98,7 +98,7 @@ public sealed partial class MainWindow
         }
 
         string? error = inlineEdit.Validate(InlineEditor.Text ?? "");
-        InlineEditor.BorderBrush = error is null ? null : (IBrush)this.FindResource("IdeError")!;
+        InlineEditor.BorderBrush = error is null ? null : Token("IdeError");
         SetStatus(error ?? (InlineEditor.AcceptsReturn ? $"{TextSummary(InlineEditor.Text ?? "")} Enter applies, Shift+Enter inserts a line break, Esc cancels." : ""));
     }
 
@@ -195,7 +195,7 @@ public sealed partial class MainWindow
                 {
                     Text = problem.Message,
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = (IBrush)this.FindResource(problem.IsError ? "IdeError" : "IdeWarning")!,
+                    Foreground = Token(problem.IsError ? "IdeError" : "IdeWarning"),
                 });
             }
         }
@@ -231,7 +231,7 @@ public sealed partial class MainWindow
             MinHeight = isText ? 64 : 0,
             PlaceholderText = isText ? "Type the text. Spaces at the start and end count." : null,
         };
-        var error = new TextBlock { Foreground = (IBrush)this.FindResource("IdeError")!, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+        var error = new TextBlock { Foreground = Token("IdeError"), TextWrapping = TextWrapping.Wrap, FontSize = 12 };
 
         void Validate() => error.Text = definition.ValidateProperty(property, box.Text ?? "") ?? "";
         void Commit()

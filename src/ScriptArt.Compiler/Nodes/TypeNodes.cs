@@ -27,6 +27,12 @@ public static class TypeNodes
     /// <summary>The object or value whose method is running, in a method graph of a class or struct.</summary>
     public const string SelfTypeId = "type.self";
 
+    /// <summary>Checks whether an object is of the class named by <see cref="CastProperty"/> and branches on it (<see cref="CastNode"/>).</summary>
+    public const string CastTypeId = "type.cast";
+
+    /// <summary>The Cast To node property holding the class it checks for: a class of the project or the full name of a .NET class.</summary>
+    public const string CastProperty = "castType";
+
     /// <summary>The node property holding the id of the type graph.</summary>
     public const string TypeProperty = "type";
 
@@ -44,11 +50,54 @@ public static class TypeNodes
 
     public const string Category = "Types";
 
+    /// <summary>The category of Cast To nodes, apart from Types, since every class of the project's references has one.</summary>
+    public const string CastCategory = "Casting";
+
     /// <summary>True for the node types whose pins come from a class or struct.</summary>
     public static bool IsTypeNode(string typeId) => typeId is CreateTypeId or GetTypeId or SetTypeId or WithTypeId or SelfTypeId;
 
     /// <summary>The local name a value of <paramref name="type"/> is stored in: Point → point.</summary>
     internal static string NameHint(string type) => char.ToLower(type[0], CultureInfo.InvariantCulture) + type[1..];
+}
+
+/// <summary>
+/// Cast To: runs Succeeded with the object as <paramref name="type"/> when it is one, otherwise Failed, then Completed. Generates
+/// <c>if (value is Type name) { … } else { … }</c>; the named value exists only in Succeeded. Godot's <c>_Input</c> uses it to tell
+/// key presses from mouse clicks.
+/// </summary>
+public sealed class CastNode(TypeRef type) : StatementNodeDefinition(
+    TypeNodes.CastTypeId,
+    $"Cast To {type.DisplayName}",
+    TypeNodes.CastCategory,
+    $"Checks whether Object is a {type.DisplayName}. If it is, runs Succeeded, where As {type.DisplayName} is the object as one; otherwise runs Failed. Then runs Completed. Generates if (value is {type.DisplayName} name).",
+    [
+        PinDefinition.ExecutionIn(),
+        PinDefinition.DataIn("object", "Object", TypeRef.Object),
+        PinDefinition.Block("succeeded", "Succeeded"),
+        PinDefinition.DataOut("result", $"As {type.DisplayName}", type),
+        PinDefinition.Block("failed", "Failed"),
+        PinDefinition.ExecutionOut("completed", "Completed"),
+    ],
+    [new PropertyDefinition(TypeNodes.CastProperty, "Class", TypeRef.String, type.SourceName)])
+{
+    public TypeRef Type { get; } = type;
+
+    public override IReadOnlyDictionary<string, string> InitialProperties { get; init; } =
+        new Dictionary<string, string> { [TypeNodes.CastProperty] = type.SourceName };
+
+    // Any class name may be typed; NodeLibrary.Resolve checks it, and an unknown class is reported on the node.
+    public override string? ValidateProperty(PropertyDefinition definition, string value) =>
+        definition?.Id == TypeNodes.CastProperty ? null : base.ValidateProperty(definition!, value);
+
+    public override void Lower(StatementLoweringContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        IrExpression value = context.Input("object");
+        IrLocal cast = context.NewLocal(TypeNodes.NameHint(Type.Name), Type);
+        IrBlock succeeded = context.LowerBlock("succeeded", NestedBlock.Conditional, ("result", cast));
+        IrBlock failed = context.LowerBlock("failed", NestedBlock.Conditional);
+        context.Emit(new IrIf(new IrTypeTest(value, Type, cast), succeeded, failed));
+    }
 }
 
 /// <summary>

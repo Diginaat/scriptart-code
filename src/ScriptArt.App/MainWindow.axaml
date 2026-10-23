@@ -6,14 +6,20 @@
         Title="ScriptArt Code"
         Width="1280" Height="800" MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen" WindowState="Maximized"
-        Background="{StaticResource IdeWindowBackground}">
+        Background="{DynamicResource IdeWindowBackground}">
+  <!-- Scales the whole UI by the UI scale preference. -->
+  <LayoutTransformControl x:Name="ScaleRoot">
   <Grid>
     <DockPanel>
-      <Menu x:Name="MainMenu" DockPanel.Dock="Top" Background="{StaticResource IdePanelHeaderBackground}">
+      <Menu x:Name="MainMenu" DockPanel.Dock="Top" Background="{DynamicResource IdePanelHeaderBackground}">
         <MenuItem Header="_File">
           <MenuItem Header="_New Project…" InputGesture="Ctrl+N" Click="OnNewProject" />
+          <MenuItem Header="New _Godot Project…" Click="OnNewGodotProject" />
           <MenuItem Header="_Open Project…" InputGesture="Ctrl+O" Click="OnOpenProject" />
-          <MenuItem x:Name="SaveMenuItem" Header="_Save" InputGesture="Ctrl+S" Click="OnSave" />
+          <MenuItem x:Name="RecentMenuItem" Header="Open _Recent" />
+          <MenuItem x:Name="OpenFileMenuItem" Header="Open _File…" InputGesture="Ctrl+P" Click="OnOpenFile" />
+          <MenuItem x:Name="SaveMenuItem" Header="_Save All" InputGesture="Ctrl+S" Click="OnSave" />
+          <MenuItem x:Name="CloseTabMenuItem" Header="_Close Tab" InputGesture="Ctrl+W" Click="OnCloseTab" />
           <Separator />
           <MenuItem x:Name="AddFunctionMenuItem" Header="Add _Function" Click="OnAddFunction" />
           <MenuItem x:Name="AddClassMenuItem" Header="Add _Class" Click="OnAddClass" />
@@ -48,6 +54,8 @@
           <MenuItem x:Name="AddCommentMenuItem" Header="Add Co_mment" InputGesture="C" Click="OnAddComment" />
         </MenuItem>
         <MenuItem Header="_View">
+          <MenuItem x:Name="ExplorerMenuItem" Header="_Files" InputGesture="Ctrl+Shift+E" Click="OnShowExplorer" />
+          <Separator />
           <MenuItem x:Name="FrameMenuItem" Header="_Frame Graph" InputGesture="Home" Click="OnFrameAll" />
           <MenuItem x:Name="MinimapMenuItem" Header="_Minimap" ToggleType="CheckBox" IsChecked="True" Click="OnToggleMinimap" />
           <MenuItem x:Name="FrameStatsMenuItem" Header="Frame _Statistics" ToggleType="CheckBox" Click="OnToggleFrameStats" />
@@ -60,12 +68,15 @@
           <MenuItem x:Name="AddPackageMenuItem" Header="Add NuGet _Package…" Click="OnAddPackage" />
           <MenuItem x:Name="AddProjectReferenceMenuItem" Header="Add Project _Reference…" Click="OnAddProjectReference" />
           <MenuItem x:Name="CreateSolutionMenuItem" Header="Create _Solution File" Click="OnCreateSolution" />
+          <MenuItem x:Name="NewSolutionProjectMenuItem" Header="_New Project in Solution…" Click="OnNewSolutionProject" />
+          <MenuItem x:Name="AddExistingProjectMenuItem" Header="Add _Existing Project to Solution…" Click="OnAddExistingProject" />
           <Separator />
           <MenuItem x:Name="RefreshFilesMenuItem" Header="Re_load Files and References" Click="OnRefreshFiles" />
+          <MenuItem x:Name="ApproveGeneratorsMenuItem" Header="Approve Source _Generators…" Click="OnApproveSourceGenerators" />
         </MenuItem>
         <MenuItem Header="_Build">
           <MenuItem x:Name="GenerateMenuItem" Header="_Generate C#" InputGesture="F6" Click="OnGenerate" />
-          <MenuItem x:Name="PreviewMenuItem" Header="_Preview Changes Before Generating" ToggleType="CheckBox" IsChecked="True" />
+          <MenuItem x:Name="PreviewMenuItem" Header="_Preview Changes Before Generating" ToggleType="CheckBox" IsChecked="True" Click="OnTogglePreview" />
           <MenuItem x:Name="BuildMenuItem" Header="_Build" InputGesture="Ctrl+Shift+B" Click="OnBuild" />
         </MenuItem>
         <MenuItem Header="_Debug">
@@ -83,22 +94,25 @@
           <MenuItem x:Name="ClearBreakpointsMenuItem" Header="Delete _All Breakpoints" Click="OnClearBreakpoints" />
         </MenuItem>
         <MenuItem Header="_Tools">
+          <MenuItem x:Name="OpenInCodeMenuItem" Header="Open Folder in _VS Code" Click="OnOpenFolderInCode" />
+          <Separator />
           <MenuItem Header="_Node Libraries…" Click="OnShowNodeLibraries" />
+          <MenuItem Header="_Preferences…" InputGesture="Ctrl+OemComma" Click="OnShowPreferences" />
         </MenuItem>
       </Menu>
 
-      <Border DockPanel.Dock="Top" Background="{StaticResource IdePanelHeaderBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,1" Padding="6,3">
+      <Border DockPanel.Dock="Top" Background="{DynamicResource IdePanelHeaderBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,1,0,1" Padding="6,3">
         <StackPanel Orientation="Horizontal">
           <Button x:Name="SaveButton" Classes="toolbar" Content="Save" ToolTip.Tip="Save project (Ctrl+S)" Click="OnSave" />
           <Button x:Name="UndoButton" Classes="toolbar" Content="Undo" Click="OnUndo" />
           <Button x:Name="RedoButton" Classes="toolbar" Content="Redo" Click="OnRedo" />
-          <Rectangle Width="1" Margin="6,4" Fill="{StaticResource IdeBorder}" />
+          <Rectangle Width="1" Margin="6,4" Fill="{DynamicResource IdeBorder}" />
           <Button x:Name="GenerateButton" Classes="toolbar" Content="Generate C#" ToolTip.Tip="Verify the graph with Roslyn and write Generated/*.g.cs (F6)" Click="OnGenerate" />
           <Button x:Name="BuildButton" Classes="toolbar" Content="Build" ToolTip.Tip="Save, generate, and run dotnet build (Ctrl+Shift+B)" Click="OnBuild" />
           <Button x:Name="DebugButton" Classes="toolbar" Content="▶ Debug" ToolTip.Tip="Build and run under the debugger, stopping at node breakpoints (F5)" Click="OnStartDebugging" />
           <Button x:Name="RunButton" Classes="toolbar" Content="Run" ToolTip.Tip="Build and run without the debugger (Ctrl+F5)" Click="OnRun" />
           <Button x:Name="StopButton" Classes="toolbar" Content="■ Stop" ToolTip.Tip="Stop the running build or program (Shift+F5)" Click="OnStop" />
-          <Rectangle Width="1" Margin="6,4" Fill="{StaticResource IdeBorder}" />
+          <Rectangle x:Name="DebugToolbarSeparator" Width="1" Margin="6,4" Fill="{DynamicResource IdeBorder}" />
           <Button x:Name="ContinueButton" Classes="toolbar" Content="Continue" ToolTip.Tip="Run on to the next breakpoint (F5)" Click="OnContinue" />
           <Button x:Name="StepOverButton" Classes="toolbar" Content="Step Over" ToolTip.Tip="Run the current statement (F10)" Click="OnStepOver" />
           <Button x:Name="StepIntoButton" Classes="toolbar" Content="Step Into" ToolTip.Tip="Step into the function or method the statement calls (F11)" Click="OnStepInto" />
@@ -106,7 +120,7 @@
         </StackPanel>
       </Border>
 
-      <Border DockPanel.Dock="Bottom" Background="{StaticResource IdePanelHeaderBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,3">
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource IdePanelHeaderBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,3">
         <Grid ColumnDefinitions="Auto,*,Auto">
           <TextBlock x:Name="ProjectText" Grid.Column="0" Classes="secondary" FontSize="12" Text="No project" />
           <TextBlock x:Name="StatusText" Grid.Column="1" FontSize="12" Margin="16,0" TextTrimming="CharacterEllipsis" />
@@ -115,10 +129,11 @@
       </Border>
 
       <Grid ColumnDefinitions="250,4,*,4,300" RowDefinitions="*,4,250">
-        <!-- Left panel: My Project (the project's graphs, types, and the open graph's variables) and the node palette. -->
+        <!-- Left panel: My Project (the project's graphs, types, and the open graph's variables), the node palette, and the project's files.
+             Graphs come first: files are there for reference and handwritten code. -->
         <Border Grid.Column="0" Classes="panel" BorderThickness="0,0,0,0">
           <TabControl x:Name="LeftTabs" Classes="bottom" Padding="0">
-            <TabItem Header="My Project">
+            <TabItem x:Name="MyProjectTab" Header="My Project">
               <DockPanel>
                 <DockPanel DockPanel.Dock="Top" Margin="6,6,6,4">
                   <Button x:Name="AddNewButton" DockPanel.Dock="Left" Content="+ Add New" Margin="0,0,6,0"
@@ -148,12 +163,53 @@
                 <ListBox x:Name="PaletteList" Classes="palette" Background="Transparent" />
               </DockPanel>
             </TabItem>
+            <TabItem x:Name="ExplorerTab" Header="Files">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                  <DockPanel Margin="0,2,6,0">
+                    <Button x:Name="SolutionActionsButton" DockPanel.Dock="Right" Classes="icon" Content="+" ToolTip.Tip="Create a solution, add a project to it, or create a new one"
+                            Click="OnSolutionActions" />
+                    <TextBlock Classes="panelTitle" Text="SOLUTION" />
+                  </DockPanel>
+                  <StackPanel x:Name="SolutionPanel" Margin="0,0,0,4" />
+                  <Border Height="1" Background="{DynamicResource IdeBorder}" />
+                  <DockPanel Margin="0,2,4,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                      <Button x:Name="NewFileButton" Classes="icon" Content="+📄" ToolTip.Tip="New graph, C# file, or other file">
+                        <Button.Flyout>
+                          <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                            <MenuItem Header="Function Graph" Click="OnAddFunction" />
+                            <MenuItem Header="Class Graph" Click="OnAddClass" />
+                            <MenuItem Header="Struct Graph" Click="OnAddStruct" />
+                            <Separator />
+                            <MenuItem Header="C# File…" Click="OnNewCSharpFile" />
+                            <MenuItem x:Name="NewOtherFileMenuItem" Header="Other File…" Click="OnNewFile" />
+                          </MenuFlyout>
+                        </Button.Flyout>
+                      </Button>
+                      <Button Classes="icon" Content="+📁" ToolTip.Tip="New folder in the selected folder" Click="OnNewFolder" />
+                      <Button x:Name="RefreshExplorerButton" Classes="icon" Content="⟳" ToolTip.Tip="Reload the folder from disk" Click="OnRefreshExplorer" />
+                      <Button Classes="icon" Content="⊟" ToolTip.Tip="Collapse all folders" Click="OnCollapseExplorer" />
+                    </StackPanel>
+                    <TextBlock x:Name="FilesTitle" Classes="panelTitle" Text="FILES" TextTrimming="CharacterEllipsis" />
+                  </DockPanel>
+                </StackPanel>
+                <TreeView x:Name="FileTree" Classes="files" Background="Transparent" />
+              </DockPanel>
+            </TabItem>
           </TabControl>
         </Border>
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
-        <!-- Graph canvas -->
-        <Panel Grid.Column="2">
+        <!-- Editor area: one tab per open graph or file, VS Code style. Graphs show the canvas; files show the code editor. -->
+        <DockPanel Grid.Column="2">
+          <Border DockPanel.Dock="Top" Background="{DynamicResource IdePanelHeaderBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,0,0,1">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+              <StackPanel x:Name="DocumentTabs" Orientation="Horizontal" />
+            </ScrollViewer>
+          </Border>
+        <Panel>
+        <Panel x:Name="GraphView">
           <canvas:NodeCanvas x:Name="GraphCanvas" />
           <!-- A class or struct has properties instead of nodes; they are edited in Details. -->
           <TextBlock x:Name="TypeGraphHint" IsVisible="False" Classes="secondary" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -163,7 +219,7 @@
                    MinHeight="0" Padding="6,2" FontSize="13" TextWrapping="Wrap" NewLine="&#10;" />
           <!-- Action menu: opened by right-clicking empty space or releasing a wire there. Nodes are grouped by category. -->
           <Border x:Name="ActionMenu" IsVisible="False" Width="380" Height="480" HorizontalAlignment="Left" VerticalAlignment="Top"
-                  Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+                  Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
                   CornerRadius="6" Padding="0,6,0,4" BoxShadow="0 6 18 0 #80000000">
             <DockPanel>
               <DockPanel DockPanel.Dock="Top" Margin="10,0,8,4">
@@ -172,13 +228,34 @@
                 <TextBlock x:Name="ActionMenuTitle" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               </DockPanel>
               <TextBox x:Name="ActionSearch" DockPanel.Dock="Top" Margin="8,0,8,4" PlaceholderText="Search: a name, a word like print or if, or what it does" />
-              <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,6,10,2" MinHeight="64">
+              <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,6,10,2" MinHeight="64">
                 <TextBlock x:Name="ActionDescription" Classes="secondary" FontSize="12" TextWrapping="Wrap" />
               </Border>
               <TreeView x:Name="ActionTree" Background="Transparent" />
             </DockPanel>
           </Border>
-          <Border x:Name="EmptyState" Background="{StaticResource IdeWindowBackground}">
+        </Panel>
+        <!-- A file open in the editor: handwritten C#, the .csproj, solutions, and other text files. -->
+        <DockPanel x:Name="FileView" IsVisible="False">
+          <Border DockPanel.Dock="Top" Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,0,0,1" Padding="10,3,6,3">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                <Button x:Name="FileOpenGraphButton" Classes="icon" Content="Open Graph" IsVisible="False" Click="OnOpenFileGraph"
+                        ToolTip.Tip="Open the graph this file is generated from" />
+                <Button Classes="icon" Content="Find" ToolTip.Tip="Find and replace in this file (Ctrl+F, Ctrl+H)" Click="OnFindInFile" />
+                <Button Classes="icon" Content="Reveal" ToolTip.Tip="Show this file in the Explorer" Click="OnRevealFile" />
+                <Button Classes="icon" Content="VS Code" ToolTip.Tip="Open this file in Visual Studio Code" Click="OnOpenFileInCode" />
+              </StackPanel>
+              <TextBlock x:Name="FileBanner" Classes="secondary" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+          </Border>
+          <Border DockPanel.Dock="Bottom" Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="0,1,0,0" Padding="10,2">
+            <TextBlock x:Name="FileStatus" Classes="secondary" FontSize="11" HorizontalAlignment="Right" />
+          </Border>
+          <edit:TextEditor x:Name="FileEditor" ShowLineNumbers="True" FontSize="14" Padding="4,2"
+                           FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="{DynamicResource IdeWindowBackground}" />
+        </DockPanel>
+          <Border x:Name="EmptyState" Background="{DynamicResource IdeWindowBackground}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
               <TextBlock Text="Build C# programs visually" FontSize="22" FontWeight="SemiBold" HorizontalAlignment="Center" />
               <TextBlock Classes="secondary" TextWrapping="Wrap" TextAlignment="Center"
@@ -187,9 +264,11 @@
                 <Button Content="New Project…" Click="OnNewProject" Padding="16,8" />
                 <Button Content="Open Project…" Click="OnOpenProject" Padding="16,8" />
               </StackPanel>
+              <StackPanel x:Name="RecentProjectsPanel" Spacing="2" Margin="0,12,0,0" />
             </StackPanel>
           </Border>
         </Panel>
+        </DockPanel>
         <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
 
         <!-- Inspector -->
@@ -205,7 +284,7 @@
         <GridSplitter Grid.Row="1" Grid.ColumnSpan="5" ResizeDirection="Rows" />
 
         <!-- Bottom panels -->
-        <TabControl x:Name="BottomTabs" Grid.Row="2" Grid.ColumnSpan="5" Classes="bottom" Background="{StaticResource IdePanelBackground}" Padding="0">
+        <TabControl x:Name="BottomTabs" Grid.Row="2" Grid.ColumnSpan="5" Classes="bottom" Background="{DynamicResource IdePanelBackground}" Padding="0">
           <TabItem x:Name="ProblemsTab" Header="Problems">
             <Panel>
               <ListBox x:Name="ProblemsList" Classes="problems" Background="Transparent" />
@@ -215,13 +294,11 @@
           <TabItem x:Name="CodeTab" Header="Code">
             <DockPanel>
               <DockPanel DockPanel.Dock="Top" Margin="10,2,6,2">
-                <Button x:Name="ShowGeneratedButton" IsVisible="False" DockPanel.Dock="Right" Content="Show Generated Code" Padding="8,2" FontSize="11"
-                        ToolTip.Tip="Show the code generated from the open graph" Click="OnShowGeneratedCode" />
                 <TextBlock x:Name="CodeBanner" Classes="secondary" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            Text="Generated code is read-only. Edit the graph to change it; put handwritten C# in separate .cs files in the project." />
               </DockPanel>
               <edit:TextEditor x:Name="CodeEditor" IsReadOnly="True" ShowLineNumbers="True" FontSize="13"
-                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
+                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="{DynamicResource IdeCodeBackground}" />
             </DockPanel>
           </TabItem>
           <TabItem x:Name="DebugTab" Header="Debug">
@@ -246,7 +323,7 @@
                 <Button x:Name="SendInputButton" Grid.Column="1" Content="Send" Margin="6,0,0,0" Click="OnSendInput" />
               </Grid>
               <edit:TextEditor x:Name="OutputEditor" IsReadOnly="True" FontSize="12"
-                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
+                               FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="{DynamicResource IdeCodeBackground}" />
             </DockPanel>
           </TabItem>
         </TabControl>
@@ -255,7 +332,7 @@
 
     <!-- Command palette: every enabled menu command and node, filtered as you type. -->
     <Border x:Name="CommandPalette" IsVisible="False" Width="560" MaxHeight="420" HorizontalAlignment="Center" VerticalAlignment="Top"
-            Margin="0,72,0,0" Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+            Margin="0,72,0,0" Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
             CornerRadius="6" Padding="0,8,0,4" BoxShadow="0 8 24 0 #A0000000">
       <DockPanel>
         <TextBox x:Name="CommandSearch" DockPanel.Dock="Top" Margin="8,0,8,6" PlaceholderText="Type a command or node name" />
@@ -265,21 +342,21 @@
 
     <!-- Generation preview: the generated files writing would change, each as a unified diff, before anything is written. -->
     <Border x:Name="DiffPreview" IsVisible="False" Background="#99000000">
-      <Border Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+      <Border Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
               CornerRadius="8" Padding="16" Margin="60,48">
         <DockPanel>
           <TextBlock x:Name="DiffTitle" DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4" />
-          <TextBlock DockPanel.Dock="Top" Classes="secondary" TextWrapping="Wrap" Margin="0,0,0,10"
+          <TextBlock x:Name="DiffNote" DockPanel.Dock="Top" Classes="secondary" TextWrapping="Wrap" Margin="0,0,0,10"
                      Text="Nothing is written until you choose Write Files. Turn this preview off with Build, Preview Changes Before Generating." />
           <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
             <Button x:Name="WriteDiffButton" Content="Write Files" Click="OnWriteGeneratedFiles" />
-            <Button Content="Cancel" Click="OnCancelDiff" />
+            <Button x:Name="CancelDiffButton" Content="Cancel" Click="OnCancelDiff" />
           </StackPanel>
           <Grid ColumnDefinitions="260,4,*">
             <ListBox x:Name="DiffFileList" Grid.Column="0" Classes="palette" Background="Transparent" />
             <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
             <edit:TextEditor x:Name="DiffEditor" Grid.Column="2" IsReadOnly="True" FontSize="12"
-                             FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="#1A1B1E" />
+                             FontFamily="Cascadia Mono, Consolas, Menlo, monospace" Background="{DynamicResource IdeCodeBackground}" />
           </Grid>
         </DockPanel>
       </Border>
@@ -287,7 +364,7 @@
 
     <!-- Node libraries the user approved; adding one asks for explicit trust first. -->
     <Border x:Name="NodeLibrariesPanel" IsVisible="False" Background="#99000000">
-      <Border Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+      <Border Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
               CornerRadius="8" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" Width="620">
         <StackPanel Spacing="12">
           <TextBlock Text="Node Libraries" FontSize="16" FontWeight="SemiBold" />
@@ -295,7 +372,7 @@
                      Text="A node library is a .dll that adds nodes to the palette. It runs inside ScriptArt Code with your permissions, so add only libraries from sources you trust. Libraries are approved for you, not for a project: opening a project never loads one. A library that changes after you approve it is not loaded until you approve it again." />
           <ListBox x:Name="NodeLibraryList" Classes="problems" Background="Transparent" MaxHeight="220" />
           <StackPanel x:Name="TrustPrompt" IsVisible="False" Spacing="8">
-            <TextBlock x:Name="TrustText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#E8B44C" />
+            <TextBlock x:Name="TrustText" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource IdeWarning}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
               <Button Content="Trust and Load" Click="OnTrustNodeLibrary" />
               <Button Content="Cancel" Click="OnCancelTrust" />
@@ -310,9 +387,51 @@
       </Border>
     </Border>
 
+    <!-- Tools > Preferences, stored per user in preferences.json. -->
+    <Border x:Name="PreferencesPanel" IsVisible="False" Background="#99000000">
+      <Border Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
+              CornerRadius="8" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" Width="560">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Preferences" FontSize="16" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="Auto,12,*" RowDefinitions="Auto,8,Auto,8,Auto,8,Auto,8,Auto,8,Auto">
+            <TextBlock Grid.Row="0" Text="Autosave every" VerticalAlignment="Center" />
+            <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="8">
+              <NumericUpDown x:Name="AutosaveBox" Minimum="0" Maximum="3600" Increment="10" FormatString="0" Width="140"
+                             ToolTip.Tip="Seconds between recovery copies of unsaved work; 0 turns autosave off" />
+              <TextBlock Classes="secondary" Text="seconds (0 = off)" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Row="2" Text="Generate" VerticalAlignment="Center" />
+            <CheckBox x:Name="PreviewBox" Grid.Row="2" Grid.Column="2" Content="Preview changes before writing generated files" />
+            <TextBlock Grid.Row="4" Text="netcoredbg" VerticalAlignment="Center" />
+            <DockPanel Grid.Row="4" Grid.Column="2">
+              <Button DockPanel.Dock="Right" Content="Browse…" Margin="6,0,0,0" Click="OnBrowseDebugger" />
+              <TextBox x:Name="DebuggerPathBox" PlaceholderText="Search PATH and the default folder" />
+            </DockPanel>
+            <TextBlock Grid.Row="6" Text="Godot" VerticalAlignment="Center" />
+            <DockPanel Grid.Row="6" Grid.Column="2">
+              <Button DockPanel.Dock="Right" Content="Browse…" Margin="6,0,0,0" Click="OnBrowseGodot" />
+              <TextBox x:Name="GodotPathBox" PlaceholderText="Godot 4 .NET executable, to run Godot projects" />
+            </DockPanel>
+            <TextBlock Grid.Row="8" Text="Theme" VerticalAlignment="Center" />
+            <ComboBox x:Name="ThemeBox" Grid.Row="8" Grid.Column="2" Width="140" />
+            <TextBlock Grid.Row="10" Text="UI scale" VerticalAlignment="Center" />
+            <ComboBox x:Name="UiScaleBox" Grid.Row="10" Grid.Column="2" Width="140" />
+          </Grid>
+          <TextBlock x:Name="PreferencesMessage" Classes="secondary" TextWrapping="Wrap" />
+          <DockPanel>
+            <Button DockPanel.Dock="Left" Content="Clear Recent Projects" Click="OnClearRecentProjects" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+              <Button Content="Save" IsDefault="True" Click="OnSavePreferences" />
+              <Button Content="Cancel" IsCancel="True" Click="OnCancelPreferences" />
+            </StackPanel>
+          </DockPanel>
+        </StackPanel>
+      </Border>
+    </Border>
+
     <!-- Unsaved-changes prompt, shown inline instead of a modal dialog. -->
     <Border x:Name="ClosePrompt" IsVisible="False" Background="#99000000">
-      <Border Background="{StaticResource IdePanelBackground}" BorderBrush="{StaticResource IdeBorder}" BorderThickness="1"
+      <Border Background="{DynamicResource IdePanelBackground}" BorderBrush="{DynamicResource IdeBorder}" BorderThickness="1"
               CornerRadius="8" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="440">
         <StackPanel Spacing="14">
           <TextBlock Text="Save changes before closing?" FontSize="16" FontWeight="SemiBold" />
@@ -326,4 +445,5 @@
       </Border>
     </Border>
   </Grid>
+  </LayoutTransformControl>
 </Window>

@@ -45,7 +45,7 @@ public partial class MainWindow
         InspectorPanel.Children.Add(new TextBlock { Text = title, Classes = { "panelTitle" }, Margin = new Avalonia.Thickness(0, 14, 0, 4) });
 
         var name = new TextBox { Text = graph.Name };
-        var nameError = new TextBlock { Foreground = (IBrush)this.FindResource("IdeError")!, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+        var nameError = new TextBlock { Foreground = Token("IdeError"), TextWrapping = TextWrapping.Wrap, FontSize = 12 };
         void ValidateName() => nameError.Text = GraphCompiler.IsValidIdentifier(name.Text ?? "") ? "" : $"'{name.Text}' is not a valid C# method name.";
         void CommitName()
         {
@@ -124,7 +124,7 @@ public partial class MainWindow
         };
         var delete = new Button { Content = "✕", Padding = new Avalonia.Thickness(8, 4) };
         ToolTip.SetTip(delete, $"Delete parameter '{parameter.Name}' and its wires");
-        var error = new TextBlock { Foreground = (IBrush)this.FindResource("IdeError")!, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+        var error = new TextBlock { Foreground = Token("IdeError"), TextWrapping = TextWrapping.Wrap, FontSize = 12 };
 
         var row = new DockPanel { Margin = new Avalonia.Thickness(0, 6, 0, 0) };
         DockPanel.SetDock(delete, Dock.Right);

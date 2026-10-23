@@ -16,12 +16,31 @@ public enum ExternalMemberKind
     Constructor,
     GetProperty,
     SetProperty,
+
+    /// <summary>An arithmetic, comparison, or negation operator a type defines, such as Godot's <c>Vector2 + Vector2</c>; written as the operator.</summary>
+    Operator,
+
+    /// <summary>
+    /// An event, such as Godot's <c>BaseButton.Pressed</c> signal; its node subscribes a handler. <see cref="ExternalMethod.Parameters"/>
+    /// are the values the handler receives.
+    /// </summary>
+    Event,
 }
 
 /// <summary>A .NET type that graphs can hold values of, such as <c>System.Text.StringBuilder</c>.</summary>
 /// <param name="IsValueType">True for a struct, which is copied and never null.</param>
 /// <param name="HasDefaultConstructor">True when <c>new T()</c> creates one, so variables and properties of the type can start with one.</param>
-public sealed record ExternalType(TypeRef Type, bool IsValueType, bool HasDefaultConstructor);
+public sealed record ExternalType(TypeRef Type, bool IsValueType, bool HasDefaultConstructor)
+{
+    /// <summary>The public classes this class derives from, nearest first, without <c>object</c>. A value of it connects to inputs of each.</summary>
+    public IReadOnlyList<TypeRef> BaseTypes { get; init; } = [];
+
+    /// <summary>True for a class that classes of the project can derive from: not sealed, and with a constructor they can call.</summary>
+    public bool IsInheritable { get; init; }
+
+    /// <summary>The public virtual or abstract instance methods declared on this type, which a derived class of the project can override.</summary>
+    public IReadOnlyList<ExternalMethod> Overridable { get; init; } = [];
+}
 
 /// <summary>A public .NET method, constructor, or property that graphs can use, with every type mapped to a <see cref="TypeRef"/>.</summary>
 /// <param name="DocumentationId">The member's documentation comment ID, such as <c>M:System.Math.Max(System.Int32,System.Int32)</c>. Stable across versions, so it names the node type.</param>
@@ -51,6 +70,21 @@ public sealed record ExternalMethod(
     public IReadOnlyList<TypeRef> TypeArguments { get; init; } = [];
 
     /// <summary>
+    /// The parameters that are <c>float</c> in .NET; graphs pass a <c>double</c>, converted at the call (D-048). Godot's API uses
+    /// <c>float</c> for most numbers.
+    /// </summary>
+    public IReadOnlyList<string> FloatParameters { get; init; } = [];
+
+    /// <summary>True when the .NET result is a <c>float</c>, which graphs read as a <c>double</c>.</summary>
+    public bool ReturnsFloat { get; init; }
+
+    /// <summary>
+    /// The type parameters constrained to classes (<c>where T : class</c>), such as Godot's <c>GetNode&lt;T&gt;</c>; their type
+    /// arguments must be classes.
+    /// </summary>
+    public IReadOnlyList<string> ClassTypeParameters { get; init; } = [];
+
+    /// <summary>
     /// The node type ID: <c>dotnet:</c> followed by the documentation ID, and <c>dotnet:set:</c> for a property setter, whose
     /// getter has the same documentation ID.
     /// </summary>
@@ -64,6 +98,10 @@ public sealed record ExternalMethod(
         ExternalMemberKind.Constructor => $"New {DeclaringType.Name}({ParameterList})",
         ExternalMemberKind.GetProperty => $"Get {DeclaringType.Name}.{Name}",
         ExternalMemberKind.SetProperty => $"Set {DeclaringType.Name}.{Name}",
+        ExternalMemberKind.Event => $"On {DeclaringType.Name}.{Name}",
+        ExternalMemberKind.Operator when ExternalApi.Operators[Name] is var (_, _, symbol) => Parameters.Count == 1
+            ? $"{symbol}{Parameters[0].Type.DisplayName}"
+            : $"{Parameters[0].Type.DisplayName} {symbol} {Parameters[1].Type.DisplayName}",
         _ => $"{DeclaringType.Name}.{Name}{(IsGeneric ? $"<{string.Join(", ", TypeArguments.Count > 0 ? TypeArguments.Select(type => type.DisplayName) : TypeParameters)}>" : "")}({ParameterList})",
     };
 
@@ -93,14 +131,36 @@ public sealed record ExternalMethod(
 
 /// <summary>
 /// Finds the members of referenced assemblies that graphs can use. A member is offered only when the generator can use it exactly
-/// as written: a public, non-obsolete method, constructor, or non-indexed property of a public, non-generic, top-level type, whose
+/// as written: a public, non-obsolete method, constructor, non-indexed property, or field of a public, non-generic, top-level type, whose
 /// parameters (no ref, out, in, or params) and result are types graphs support. A generic method is offered when its type parameters
-/// have no constraints beyond <c>notnull</c>. Trailing optional parameters of other types are left to their defaults. Everything
-/// else is filtered out.
+/// have no constraints beyond <c>notnull</c> and <c>class</c>. Trailing optional parameters of other types are left to their defaults. Everything
+/// else is filtered out. Two mappings make Godot's API usable (D-048): a <c>float</c> is read and passed as a <c>double</c>, and a type
+/// that converts implicitly to and from <c>string</c>, such as <c>StringName</c>, is a <c>string</c>.
 /// </summary>
 public static class ExternalApi
 {
     public const string TypeIdPrefix = "dotnet:";
+
+    /// <summary>The user-defined operators offered as nodes (D-049), by metadata name: the IR operator, or Negate for unary minus.</summary>
+    internal static readonly IReadOnlyDictionary<string, (IrBinaryOperator? Binary, IrUnaryOperator? Unary, string Symbol)> Operators =
+        new Dictionary<string, (IrBinaryOperator?, IrUnaryOperator?, string)>(StringComparer.Ordinal)
+        {
+            ["op_Addition"] = (IrBinaryOperator.Add, null, "+"),
+            ["op_Subtraction"] = (IrBinaryOperator.Subtract, null, "-"),
+            ["op_Multiply"] = (IrBinaryOperator.Multiply, null, "*"),
+            ["op_Division"] = (IrBinaryOperator.Divide, null, "/"),
+            ["op_Modulus"] = (IrBinaryOperator.Remainder, null, "%"),
+            ["op_Equality"] = (IrBinaryOperator.Equal, null, "=="),
+            ["op_Inequality"] = (IrBinaryOperator.NotEqual, null, "!="),
+            ["op_LessThan"] = (IrBinaryOperator.LessThan, null, "<"),
+            ["op_LessThanOrEqual"] = (IrBinaryOperator.LessThanOrEqual, null, "<="),
+            ["op_GreaterThan"] = (IrBinaryOperator.GreaterThan, null, ">"),
+            ["op_GreaterThanOrEqual"] = (IrBinaryOperator.GreaterThanOrEqual, null, ">="),
+            ["op_UnaryNegation"] = (null, IrUnaryOperator.Negate, "-"),
+        };
+
+    /// <summary><c>float</c>: not a graph type, but the type .NET members take where graphs pass a <c>double</c>.</summary>
+    internal static readonly TypeRef Float = new("System", "Single", "float");
 
     /// <summary>The node property holding the type arguments of a generic method node, such as <c>int</c>.</summary>
     public const string TypeArgumentsProperty = "typeArguments";
@@ -195,10 +255,24 @@ public static class ExternalApi
 
             bool hasDefault = type.IsValueType || (!type.IsAbstract && type.InstanceConstructors.Any(constructor =>
                 constructor.DeclaredAccessibility == Accessibility.Public && constructor.Parameters.Length == 0 && !IsHidden(constructor)));
-            valueTypes.TryAdd(type, new ExternalType(TypeRef.External(type.ContainingNamespace.ToDisplayString(), type.Name), type.IsValueType, hasDefault));
+            bool inheritable = type.TypeKind == TypeKind.Class && !type.IsSealed && type.InstanceConstructors.Any(constructor =>
+                constructor.DeclaredAccessibility is Accessibility.Public or Accessibility.Protected or Accessibility.ProtectedOrInternal && constructor.Parameters.Length == 0);
+            valueTypes.TryAdd(type, new ExternalType(TypeRef.External(type.ContainingNamespace.ToDisplayString(), type.Name), type.IsValueType, hasDefault)
+            {
+                BaseTypes = [.. BaseClasses(type).Select(baseType => TypeRef.External(baseType.ContainingNamespace.ToDisplayString(), baseType.Name))],
+                IsInheritable = inheritable,
+            });
         }
 
         var mapper = new TypeMapper(valueTypes);
+        foreach ((INamedTypeSymbol type, ExternalType external) in valueTypes.ToArray())
+        {
+            if (external.IsInheritable)
+            {
+                valueTypes[type] = external with { Overridable = [.. OverridableMethods(type, external.Type, mapper)] };
+            }
+        }
+
         List<ExternalMethod> members = [];
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (INamedTypeSymbol type in offered)
@@ -223,17 +297,22 @@ public static class ExternalApi
 
     /// <summary>
     /// A call that leaves out optional parameters can bind to another overload with exactly the remaining parameters, so a member that
-    /// dropped parameters is not offered when such an overload is.
+    /// dropped parameters is not offered when such an overload is. Likewise a float overload is not offered beside the double one
+    /// that graphs see with the same types.
     /// </summary>
     private static List<ExternalMethod> RemoveShadowedOverloads(List<ExternalMethod> members)
     {
         static string Shape(ExternalMethod member) =>
             $"{member.Kind}|{member.DeclaringType.SourceName}|{member.Name}|{member.IsStatic}|{member.TypeParameters.Count}|{string.Join(",", member.Parameters.Select(parameter => parameter.Type.SourceName))}";
 
-        // Members that keep all their parameters list them all in their documentation ID; those come first.
+        // Members that take and return the types graphs have come first, so a float overload never hides the double one (D-048);
+        // then members that keep all their parameters, which list them all in their documentation ID.
         return [.. members
             .GroupBy(Shape)
-            .Select(group => group.OrderBy(member => member.DocumentationId.Count(character => character == ',')).First())];
+            .Select(group => group
+                .OrderBy(member => member.FloatParameters.Count + (member.ReturnsFloat ? 1 : 0))
+                .ThenBy(member => member.DocumentationId.Count(character => character == ','))
+                .First())];
     }
 
     private static IEnumerable<ExternalMethod> ToExternalMembers(ISymbol member, TypeRef declaring, TypeMapper mapper)
@@ -255,11 +334,32 @@ public static class ExternalApi
                 }
 
                 break;
+            case IMethodSymbol { MethodKind: MethodKind.UserDefinedOperator } op when Operators.ContainsKey(op.Name):
+                // Operators have no side effects to graphs, like the built-in math nodes.
+                if (ToMethod(op, id, declaring, mapper, pure: true) is { } operatorMethod && operatorMethod.ReturnType != TypeRef.Void)
+                {
+                    yield return operatorMethod with { Kind = ExternalMemberKind.Operator, IsPure = true };
+                }
+
+                break;
             case IMethodSymbol { MethodKind: MethodKind.Constructor, IsStatic: false } constructor when hasValues && !constructor.ContainingType.IsAbstract:
                 if (Parameters(constructor, mapper) is { } parameters)
                 {
                     // A class object has identity, so creating one is a statement; a struct value is pure, as for the project's types.
-                    yield return new ExternalMethod(id, declaring, declaring.Name, IsStatic: true, parameters, declaring, IsPure: constructor.ContainingType.IsValueType, Kind: ExternalMemberKind.Constructor);
+                    yield return new ExternalMethod(id, declaring, declaring.Name, IsStatic: true, parameters, declaring, IsPure: constructor.ContainingType.IsValueType, Kind: ExternalMemberKind.Constructor)
+                    {
+                        FloatParameters = FloatParametersOf(constructor, parameters.Count),
+                    };
+                }
+
+                break;
+            case IEventSymbol { DeclaredAccessibility: Accessibility.Public, Type: INamedTypeSymbol { DelegateInvokeMethod: { ReturnsVoid: true } invoke } } ev
+                when (ev.IsStatic || hasValues) && !IsHidden(ev):
+                // The handler's parameters are its outputs; a lambda takes their types from the event, so float and StringName work.
+                if (Parameters(invoke, mapper) is { } received && received.Count == invoke.Parameters.Length
+                    && !received.Exists(parameter => parameter.Item1 == "handler"))
+                {
+                    yield return new ExternalMethod(id, declaring, ev.Name, ev.IsStatic, received, TypeRef.Void, IsPure: false, Kind: ExternalMemberKind.Event);
                 }
 
                 break;
@@ -273,24 +373,76 @@ public static class ExternalApi
                 {
                     // Reading a property happens where its value is used, like Get of a property of the project's types.
                     yield return new ExternalMethod(id, declaring, property.Name, property.IsStatic, [], type, IsPure: true,
-                        ReturnsNullable: property.NullableAnnotation == NullableAnnotation.Annotated, Kind: ExternalMemberKind.GetProperty);
+                        ReturnsNullable: property.NullableAnnotation == NullableAnnotation.Annotated, Kind: ExternalMemberKind.GetProperty)
+                    {
+                        ReturnsFloat = property.Type.SpecialType == SpecialType.System_Single,
+                    };
                 }
 
                 // Setting a property of a struct value would change a copy (CS1612), as with the project's structs.
                 if (property.SetMethod is { DeclaredAccessibility: Accessibility.Public, IsInitOnly: false } && (property.IsStatic || !property.ContainingType.IsValueType))
                 {
                     yield return new ExternalMethod(id, declaring, property.Name, property.IsStatic, [("value", mapper.Map(property.Type, isParameter: true)!)], TypeRef.Void,
-                        IsPure: false, Kind: ExternalMemberKind.SetProperty);
+                        IsPure: false, Kind: ExternalMemberKind.SetProperty)
+                    {
+                        FloatParameters = property.Type.SpecialType == SpecialType.System_Single ? ["value"] : [],
+                    };
+                }
+
+                break;
+            case IFieldSymbol { IsConst: false, IsImplicitlyDeclared: false } field when field.IsStatic || hasValues:
+                // A public field reads and writes like a property, such as Godot's Vector2.X; a readonly one only reads.
+                if (mapper.Map(field.Type, isParameter: false) is not { } fieldType || IsNullableResult(field.Type, field.NullableAnnotation, fieldType))
+                {
+                    break;
+                }
+
+                yield return new ExternalMethod(id, declaring, field.Name, field.IsStatic, [], fieldType, IsPure: true,
+                    ReturnsNullable: field.NullableAnnotation == NullableAnnotation.Annotated, Kind: ExternalMemberKind.GetProperty)
+                {
+                    ReturnsFloat = field.Type.SpecialType == SpecialType.System_Single,
+                };
+                if (!field.IsReadOnly && (field.IsStatic || !field.ContainingType.IsValueType))
+                {
+                    yield return new ExternalMethod(id, declaring, field.Name, field.IsStatic, [("value", mapper.Map(field.Type, isParameter: true)!)], TypeRef.Void,
+                        IsPure: false, Kind: ExternalMemberKind.SetProperty)
+                    {
+                        FloatParameters = field.Type.SpecialType == SpecialType.System_Single ? ["value"] : [],
+                    };
                 }
 
                 break;
         }
     }
 
+    // The public classes a type derives from, nearest first; object is left out, as every class derives from it.
+    private static IEnumerable<INamedTypeSymbol> BaseClasses(INamedTypeSymbol type)
+    {
+        for (INamedTypeSymbol? baseType = type.BaseType; baseType is { SpecialType: not SpecialType.System_Object }; baseType = baseType.BaseType)
+        {
+            if (baseType.DeclaredAccessibility != Accessibility.Public || baseType.IsGenericType)
+            {
+                yield break;
+            }
+
+            yield return baseType;
+        }
+    }
+
+    // The public virtual and abstract instance methods declared on the type whose signatures graphs support.
+    private static IEnumerable<ExternalMethod> OverridableMethods(INamedTypeSymbol type, TypeRef declaring, TypeMapper mapper) =>
+        type.GetMembers().OfType<IMethodSymbol>()
+            .Where(method => method is { MethodKind: MethodKind.Ordinary, IsStatic: false, IsSealed: false, IsGenericMethod: false, DeclaredAccessibility: Accessibility.Public }
+                && (method.IsVirtual || method.IsAbstract || method.IsOverride) && method.GetDocumentationCommentId() is not null)
+            .Select(method => ToMethod(method, method.GetDocumentationCommentId()!, declaring, mapper, pure: false))
+            .OfType<ExternalMethod>()
+            .Where(method => !method.IsAsync && method.FloatParameters.Count == 0 && !method.ReturnsFloat);
+
     private static ExternalMethod? ToMethod(IMethodSymbol method, string id, TypeRef declaring, TypeMapper mapper, bool pure)
     {
+        // Only the class constraint is checked by the node library (NodeLibrary.Resolve); methods with other constraints are not offered.
         if (method.IsGenericMethod && method.TypeParameters.Any(parameter =>
-            parameter.HasReferenceTypeConstraint || parameter.HasValueTypeConstraint || parameter.HasUnmanagedTypeConstraint
+            parameter.HasValueTypeConstraint || parameter.HasUnmanagedTypeConstraint
             || parameter.HasConstructorConstraint || parameter.ConstraintTypes.Length > 0 || parameter.AllowsRefLikeType))
         {
             return null;
@@ -321,8 +473,17 @@ public static class ExternalApi
 
         bool nullable = returnType != TypeRef.Void && returned.IsReferenceType && annotation == NullableAnnotation.Annotated;
         return new ExternalMethod(id, declaring, method.Name, method.IsStatic, parameters, returnType, pure && returnType != TypeRef.Void && !isAsync, nullable,
-            TypeParameters: [.. method.TypeParameters.Select(parameter => parameter.Name)], IsAsync: isAsync);
+            TypeParameters: [.. method.TypeParameters.Select(parameter => parameter.Name)], IsAsync: isAsync)
+        {
+            FloatParameters = FloatParametersOf(method, parameters.Count),
+            ReturnsFloat = returned.SpecialType == SpecialType.System_Single,
+            ClassTypeParameters = [.. method.TypeParameters.Where(parameter => parameter.HasReferenceTypeConstraint).Select(parameter => parameter.Name)],
+        };
     }
+
+    // The float parameters among the first count, which are those graphs pass.
+    private static string[] FloatParametersOf(IMethodSymbol method, int count) =>
+        [.. method.Parameters.Take(count).Where(parameter => parameter.Type.SpecialType == SpecialType.System_Single).Select(parameter => parameter.Name)];
 
     /// <summary>
     /// True when a result may be null and there is no empty value to put in its place: graph values are never null, so a string or
@@ -347,7 +508,8 @@ public static class ExternalApi
                 break;
             }
 
-            if (type is null || !GraphCompiler.IsValidIdentifier(parameter.Name) || ReservedPinIds.Contains(parameter.Name))
+            // A parameter named with a keyword, such as Godot's @event, is fine: its name is only a pin id, and arguments are positional.
+            if (type is null || !SyntaxFacts.IsValidIdentifier(parameter.Name) || ReservedPinIds.Contains(parameter.Name))
             {
                 return null;
             }
@@ -389,7 +551,8 @@ public static class ExternalApi
     public static NodeDefinition CreateNode(ExternalMethod method)
     {
         ArgumentNullException.ThrowIfNull(method);
-        return method.IsPure ? new ExternalPureMethodNode(method) : new ExternalMethodNode(method);
+        return method.Kind == ExternalMemberKind.Event ? new ExternalEventNode(method)
+            : method.IsPure ? new ExternalPureMethodNode(method) : new ExternalMethodNode(method);
     }
 
     internal static IReadOnlyList<PinDefinition> DataInputs(ExternalMethod method) =>
@@ -411,6 +574,8 @@ public static class ExternalApi
         ExternalMemberKind.Constructor => $"Creates a new {method.DeclaringType.Namespace}.{method.DeclaringType.Name}.",
         ExternalMemberKind.GetProperty => $"The {method.ReturnType} property {method.Name} of {method.DeclaringType.Namespace}.{method.DeclaringType.Name}.",
         ExternalMemberKind.SetProperty => $"Sets the property {method.Name} of {method.DeclaringType.Namespace}.{method.DeclaringType.Name}.",
+        ExternalMemberKind.Event => $"Runs Handler each time {method.DeclaringType.Namespace}.{method.DeclaringType.Name}.{method.Name} happens (for Godot, each time the signal is emitted), from then on. Generates {method.Name} += (…) => {{ … }}.",
+        ExternalMemberKind.Operator => $"{method.DisplayName}, as {method.DeclaringType.Namespace}.{method.DeclaringType.Name} defines it, giving a {method.ReturnType}.",
         _ => $"Calls {method.DeclaringType.Namespace}.{method.DisplayName}{(method.ReturnType == TypeRef.Void ? "" : $" and outputs the {method.ReturnType} it returns")}"
             + (method.IsAsync ? ", waiting for it to finish." : ".")
             + (method.IsGeneric ? " Choose the types it works with in Type Arguments." : ""),
@@ -418,12 +583,14 @@ public static class ExternalApi
 
     internal static IrExpression Call(ExternalMethod method, ExpressionLoweringContext context)
     {
-        IrExpression[] arguments = [.. method.Parameters.Select(parameter => context.Input(parameter.Name))];
+        IrExpression[] arguments = [.. method.Parameters.Select(parameter => Argument(method, parameter.Name, context.Input(parameter.Name)))];
         IrExpression receiver = method.IsStatic ? new IrTypeReference(method.DeclaringType) : context.Input("instance");
         IrExpression call = method.Kind switch
         {
             ExternalMemberKind.Constructor => new IrObjectCreation(method.DeclaringType, arguments),
             ExternalMemberKind.GetProperty => new IrMemberAccess(receiver, method.Name, method.ReturnType),
+            ExternalMemberKind.Operator when Operators[method.Name] is { Binary: { } binary } => new IrBinary(binary, arguments[0], arguments[1], method.ReturnType),
+            ExternalMemberKind.Operator => new IrUnary(Operators[method.Name].Unary!.Value, arguments[0], method.ReturnType),
             _ when method.IsStatic => new IrStaticCall(method.DeclaringType, method.Name, arguments, method.ReturnType, method.TypeArguments),
             _ => new IrInstanceCall(receiver, method.Name, arguments, method.ReturnType, method.TypeArguments),
         };
@@ -443,6 +610,10 @@ public static class ExternalApi
         return new IrBinary(IrBinaryOperator.Coalesce, call, fallback, method.ReturnType);
     }
 
+    /// <summary>The value graphs pass for a parameter: a <c>double</c> is narrowed to the <c>float</c> the member takes.</summary>
+    internal static IrExpression Argument(ExternalMethod method, string parameter, IrExpression value) =>
+        method.FloatParameters.Contains(parameter) ? new IrConvert(value, Float) : value;
+
     internal static string ResultName(ExternalMethod method)
     {
         string source = method.Kind == ExternalMemberKind.Constructor ? method.DeclaringType.Name : method.Name;
@@ -457,6 +628,14 @@ public static class ExternalApi
     {
         public bool IsValueType(INamedTypeSymbol type) => valueTypes.ContainsKey(type);
 
+        private static bool ConvertsToAndFromString(INamedTypeSymbol type)
+        {
+            IMethodSymbol[] conversions = [.. type.GetMembers(WellKnownMemberNames.ImplicitConversionName).OfType<IMethodSymbol>()
+                .Where(conversion => conversion.DeclaredAccessibility == Accessibility.Public)];
+            return conversions.Any(conversion => conversion.Parameters is [{ Type.SpecialType: SpecialType.System_String }])
+                && conversions.Any(conversion => conversion.ReturnType.SpecialType == SpecialType.System_String);
+        }
+
         /// <summary>The graph type for a .NET type, or null when graphs do not support it. A parameter also accepts a list as an interface it implements.</summary>
         public TypeRef? Map(ITypeSymbol type, bool isParameter)
         {
@@ -466,6 +645,9 @@ public static class ExternalApi
                 case SpecialType.System_Int32: return TypeRef.Int32;
                 case SpecialType.System_Double: return TypeRef.Double;
                 case SpecialType.System_String: return TypeRef.String;
+
+                // Graphs have one floating-point type; float values widen to it, and arguments are narrowed at the call (D-048).
+                case SpecialType.System_Single: return TypeRef.Double;
             }
 
             if (type is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } parameter)
@@ -476,6 +658,12 @@ public static class ExternalApi
             if (type is not INamedTypeSymbol named)
             {
                 return null;
+            }
+
+            // A type that converts implicitly to and from string, such as Godot's StringName and NodePath, is a string to graphs.
+            if (ConvertsToAndFromString(named))
+            {
+                return TypeRef.String;
             }
 
             if (valueTypes.TryGetValue(named, out ExternalType? external))
@@ -534,7 +722,7 @@ public sealed class ExternalMethodNode(ExternalMethod method) : StatementNodeDef
         if (Method.Kind == ExternalMemberKind.SetProperty)
         {
             IrExpression receiver = Method.IsStatic ? new IrTypeReference(Method.DeclaringType) : context.Input("instance");
-            context.Emit(new IrMemberAssignment(receiver, Method.Name, context.Input("value")));
+            context.Emit(new IrMemberAssignment(receiver, Method.Name, ExternalApi.Argument(Method, "value", context.Input("value"))));
             return;
         }
 
@@ -546,6 +734,35 @@ public sealed class ExternalMethodNode(ExternalMethod method) : StatementNodeDef
         }
 
         context.DeclareOutput("result", call, ExternalApi.ResultName(Method), whenUnused: call);
+    }
+}
+
+/// <summary>
+/// On: subscribes Handler to a .NET event, such as a Godot signal. Generates <c>instance.Event += (values) =&gt; { handler };</c>;
+/// the values the event passes are outputs inside Handler only (D-051).
+/// </summary>
+public sealed class ExternalEventNode(ExternalMethod method) : StatementNodeDefinition(
+    method.TypeId,
+    method.DisplayName,
+    ExternalApi.Category(method),
+    ExternalApi.Description(method),
+    [
+        PinDefinition.ExecutionIn(),
+        .. method.IsStatic ? [] : new[] { PinDefinition.DataIn("instance", method.DeclaringType.DisplayName, method.DeclaringType) },
+        PinDefinition.Block("handler", "Handler"),
+        .. method.Parameters.Select(parameter => PinDefinition.DataOut(parameter.Name, parameter.Name, parameter.Type)),
+        PinDefinition.ExecutionOut(),
+    ])
+{
+    public ExternalMethod Method { get; } = method;
+
+    public override void Lower(StatementLoweringContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        IrExpression receiver = Method.IsStatic ? new IrTypeReference(Method.DeclaringType) : context.Input("instance");
+        IrLocal[] received = [.. Method.Parameters.Select(parameter => context.NewLocal(parameter.Name, parameter.Type))];
+        IrBlock handler = context.LowerBlock("handler", NestedBlock.Handler, [.. Method.Parameters.Select((parameter, i) => (parameter.Name, received[i]))]);
+        context.Emit(new IrEventSubscription(receiver, Method.Name, new IrLambda(received, handler, TypedParameters: false)));
     }
 }
 

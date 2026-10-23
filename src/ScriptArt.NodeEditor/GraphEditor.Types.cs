@@ -46,6 +46,118 @@ public sealed partial class GraphEditor
         }
     }
 
+    /// <summary>
+    /// Sets the .NET class a class graph derives from, such as <c>Godot.CharacterBody2D</c>, or none for null or blank text. A
+    /// class that is not offered or cannot be derived from is stored and reported by the compiler.
+    /// </summary>
+    public void SetBaseType(string? baseType)
+    {
+        string? old = Graph.BaseType;
+        string? updated = string.IsNullOrWhiteSpace(baseType) ? null : baseType.Trim();
+        if (old != updated)
+        {
+            Execute(new Edit("Change base class", () => Graph.BaseType = updated, () => Graph.BaseType = old));
+        }
+    }
+
+    /// <summary>Declares a Godot signal with a unique name such as <c>Signal1</c> and no values (D-051).</summary>
+    public GraphSignal AddSignal()
+    {
+        string name = "Signal1";
+        for (int suffix = 2; Graph.Signals.Exists(signal => signal.Name == name); suffix++)
+        {
+            name = "Signal" + suffix.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var added = new GraphSignal { Id = GraphDocument.NewId(), Name = name };
+        Execute(new Edit("Add signal", () => Graph.Signals.Add(added), () => Graph.Signals.Remove(added)));
+        return added;
+    }
+
+    /// <summary>Renames a signal; its Emit and On nodes refer to it by id and stay attached. Invalid names are reported by the compiler.</summary>
+    public void RenameSignal(string signalId, string name)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        GraphSignal signal = FindSignal(signalId);
+        string old = signal.Name;
+        if (old != name)
+        {
+            Execute(new Edit("Rename signal", () => signal.Name = name, () => signal.Name = old));
+        }
+    }
+
+    /// <summary>
+    /// Replaces the values a signal sends, written as in C#: <c>int damage, string source</c>. A value keeps its id, and so the
+    /// wires of its pins, while its name stays. False, changing nothing, when the text is not such a list.
+    /// </summary>
+    public bool SetSignalParameters(string signalId, string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        GraphSignal signal = FindSignal(signalId);
+        if (ParseParameters(text) is not { } parsed)
+        {
+            return false;
+        }
+
+        GraphParameter[] old = [.. signal.Parameters];
+        GraphParameter[] updated = [.. parsed.Select(parameter => old.FirstOrDefault(existing => existing.Name == parameter.Name) is { } kept
+            ? new GraphParameter { Id = kept.Id, Name = parameter.Name, Type = parameter.Type }
+            : new GraphParameter { Id = GraphDocument.NewId(), Name = parameter.Name, Type = parameter.Type })];
+        if (!FormatParameters(old).Equals(FormatParameters(updated), StringComparison.Ordinal))
+        {
+            Execute(new Edit("Change signal values", () => Replace(updated), () => Replace(old)));
+        }
+
+        return true;
+
+        void Replace(GraphParameter[] parameters)
+        {
+            signal.Parameters.Clear();
+            signal.Parameters.AddRange(parameters);
+        }
+    }
+
+    public void DeleteSignal(string signalId)
+    {
+        GraphSignal signal = FindSignal(signalId);
+        int index = Graph.Signals.IndexOf(signal);
+        Execute(new Edit("Delete signal", () => Graph.Signals.Remove(signal), () => Graph.Signals.Insert(index, signal)));
+    }
+
+    /// <summary>A parameter list as C# writes it, such as <c>int damage, string source</c>; empty for none.</summary>
+    public static string FormatParameters(IEnumerable<GraphParameter> parameters) =>
+        string.Join(", ", parameters.Select(parameter => $"{parameter.Type} {parameter.Name}"));
+
+    /// <summary>
+    /// Reads <c>int damage, string source</c> as (type, name) pairs; blank text is none. Null when an item is not a type followed by a
+    /// name. Names and types are checked by the compiler; generic types, whose commas would split them, cannot be sent by signals.
+    /// </summary>
+    public static IReadOnlyList<(string Type, string Name)>? ParseParameters(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        List<(string, string)> parameters = [];
+        foreach (string item in text.Split(','))
+        {
+            string[] words = item.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length != 2)
+            {
+                return null;
+            }
+
+            parameters.Add((words[0], words[1]));
+        }
+
+        return parameters;
+    }
+
+    private GraphSignal FindSignal(string signalId) =>
+        Graph.Signals.Find(signal => signal.Id == signalId) ?? throw new ArgumentException($"Unknown signal '{signalId}'.", nameof(signalId));
+
     /// <summary>Renames a property. Invalid names are stored and reported by the compiler.</summary>
     public void RenameProperty(string propertyId, string name)
     {
@@ -84,6 +196,17 @@ public sealed partial class GraphEditor
         if (old != value)
         {
             Execute(new Edit("Change initial value", () => property.Value = value, () => property.Value = old));
+        }
+    }
+
+    /// <summary>Exports a property to the Godot editor, or stops exporting it.</summary>
+    public void SetPropertyExport(string propertyId, bool export)
+    {
+        GraphProperty property = FindProperty(propertyId);
+        bool old = property.Export;
+        if (old != export)
+        {
+            Execute(new Edit(export ? "Export property" : "Stop exporting property", () => property.Export = export, () => property.Export = old));
         }
     }
 

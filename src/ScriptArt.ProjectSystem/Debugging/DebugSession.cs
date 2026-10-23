@@ -21,14 +21,20 @@ public static class DebuggerLocator
     public const string PathVariable = "VSIDE_NETCOREDBG";
 
     /// <summary>
-    /// The path of <c>netcoredbg</c>: <see cref="PathVariable"/>, then <c>netcoredbg</c> on <c>PATH</c>, then
-    /// <c>netcoredbg/netcoredbg</c> in the IDE's folder under the local application data folder; null when none exists.
+    /// The path of <c>netcoredbg</c>: <see cref="PathVariable"/>, then <paramref name="preferredPath"/> (the path set in
+    /// preferences) when it exists, then <c>netcoredbg</c> on <c>PATH</c>, then <c>netcoredbg/netcoredbg</c> in the IDE's folder under
+    /// the local application data folder; null when none exists.
     /// </summary>
-    public static string? Find()
+    public static string? Find(string? preferredPath = null)
     {
         if (Environment.GetEnvironmentVariable(PathVariable) is { Length: > 0 } configured)
         {
             return File.Exists(configured) ? Path.GetFullPath(configured) : null;
+        }
+
+        if (preferredPath is { Length: > 0 } && File.Exists(preferredPath))
+        {
+            return Path.GetFullPath(preferredPath);
         }
 
         string executable = OperatingSystem.IsWindows() ? "netcoredbg.exe" : "netcoredbg";
@@ -138,6 +144,67 @@ public sealed class DebugSession : IAsyncDisposable
             }
 
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Starts the Godot project in <paramref name="projectDirectory"/> with <paramref name="godotPath"/>
+    /// (<see cref="DotNetProcess.StartGodot"/>) and attaches <paramref name="debuggerPath"/> once Godot has loaded the .NET runtime
+    /// (D-047). Godot hosts the runtime itself, so no startup hook holds the game: breakpoints are set a moment after it starts, and
+    /// code that runs before then, such as the first scene's <c>_Ready</c>, may run without stopping.
+    /// </summary>
+    public static async Task<DebugSession> StartGodotAsync(string debuggerPath, string godotPath, string projectDirectory,
+        IReadOnlyDictionary<string, IReadOnlyList<int>> breakpoints, Action<string> output, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(breakpoints);
+        ArgumentNullException.ThrowIfNull(output);
+        DotNetProcess game = DotNetProcess.StartGodot(godotPath, projectDirectory, output);
+        Process? adapter = null;
+        try
+        {
+            var waited = Stopwatch.StartNew();
+            while (!HasLoadedRuntime(game.Id))
+            {
+                if (game.HasExited || waited.Elapsed > StartTimeout)
+                {
+                    throw new InvalidOperationException("Godot did not load the .NET runtime. Is it the .NET (mono) build of Godot 4, and is the project built?");
+                }
+
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
+
+            adapter = StartAdapter(debuggerPath, output);
+            var session = new DebugSession(game, adapter, new DebugAdapterConnection(adapter.StandardOutput.BaseStream, adapter.StandardInput.BaseStream));
+            await session.AttachAsync(breakpoints, cancellationToken).ConfigureAwait(false);
+            return session;
+        }
+        catch
+        {
+            game.Stop();
+            game.Dispose();
+            if (adapter is not null)
+            {
+                Kill(adapter);
+                adapter.Dispose();
+            }
+
+            throw;
+        }
+    }
+
+    // True once the process has loaded CoreCLR (coreclr.dll, libcoreclr.so, or libcoreclr.dylib), which the debugger attaches to.
+    private static bool HasLoadedRuntime(int processId)
+    {
+        try
+        {
+            using Process process = Process.GetProcessById(processId);
+            return process.Modules.Cast<ProcessModule>().Any(module =>
+                Path.GetFileNameWithoutExtension(module.ModuleName).Equals(OperatingSystem.IsWindows() ? "coreclr" : "libcoreclr", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            // Not started yet, already gone, or its modules cannot be read yet.
+            return false;
         }
     }
 

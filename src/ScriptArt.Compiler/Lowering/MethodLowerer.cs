@@ -157,13 +157,13 @@ internal sealed class MethodLowerer : ILoweringHost
     }
 
     /// <summary>True when Break and Continue are allowed: inside a loop body that does not enclose the innermost Finally block.</summary>
-    public bool IsInLoopBody => blocks.LastIndexOf(NestedBlock.LoopBody) > blocks.LastIndexOf(NestedBlock.Finally);
+    public bool IsInLoopBody => blocks.LastIndexOf(NestedBlock.LoopBody) > Math.Max(blocks.LastIndexOf(NestedBlock.Finally), blocks.LastIndexOf(NestedBlock.Handler));
 
     /// <summary>True inside a Finally block, which control cannot leave with return.</summary>
-    public bool IsInFinally => blocks.Contains(NestedBlock.Finally);
+    public bool IsInFinally => blocks.LastIndexOf(NestedBlock.Finally) > blocks.LastIndexOf(NestedBlock.Handler);
 
     /// <summary>True inside a Catch block that does not enclose the innermost Finally block, where <c>throw;</c> is allowed (CS0724).</summary>
-    public bool IsInCatch => blocks.LastIndexOf(NestedBlock.Catch) > blocks.LastIndexOf(NestedBlock.Finally);
+    public bool IsInCatch => blocks.LastIndexOf(NestedBlock.Catch) > Math.Max(blocks.LastIndexOf(NestedBlock.Finally), blocks.LastIndexOf(NestedBlock.Handler));
 
     /// <summary>
     /// Lowers the body of a loop node. <paramref name="loopValues"/> are the node's data outputs that only exist inside the body,
@@ -231,7 +231,8 @@ internal sealed class MethodLowerer : ILoweringHost
             ? LowerPureNode(source, pure)
             : LookUpLocal(output, input);
 
-        return value.Type == pin.DataType || value is IrError ? value : new IrConvert(value, pin.DataType);
+        // Only int to double needs a conversion; a value of a class passed to an input of a class it derives from is already one.
+        return value.Type == pin.DataType || value is IrError || pin.DataType.Keyword is null ? value : new IrConvert(value, pin.DataType);
     }
 
     public bool IsOutputUsed(ResolvedNode node, string pinId) =>

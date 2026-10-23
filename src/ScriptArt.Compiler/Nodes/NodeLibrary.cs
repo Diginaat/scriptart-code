@@ -47,6 +47,62 @@ public sealed class NodeLibrary
         return externalTypes.GetValueOrDefault(type.SourceName);
     }
 
+    /// <summary>
+    /// The classes a value of <paramref name="type"/> derives from, nearest first: for a class of the project, its
+    /// <see cref="GraphDocument.BaseType"/> and that class's bases; for a .NET class, its <see cref="ExternalType.BaseTypes"/>.
+    /// A value connects to inputs of each of them.
+    /// </summary>
+    public IReadOnlyList<TypeRef> BaseTypesOf(TypeRef type, IEnumerable<GraphDocument> projectGraphs)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        ArgumentNullException.ThrowIfNull(projectGraphs);
+        if (type.IsProjectType)
+        {
+            return projectGraphs.FirstOrDefault(graph => graph.Kind == GraphKind.Class && graph.Name == type.Name) is { BaseType: { } name }
+                && TypeRef.FromName(name) is { IsExternal: true } baseType
+                ? [baseType, .. FindExternalType(baseType)?.BaseTypes ?? []]
+                : [];
+        }
+
+        return FindExternalType(type)?.BaseTypes ?? [];
+    }
+
+    /// <summary>
+    /// The types a value of <paramref name="type"/> connects to besides its own: its base classes (<see cref="BaseTypesOf"/>) and, for
+    /// any class, <see cref="TypeRef.Object"/>.
+    /// </summary>
+    public IReadOnlyList<TypeRef> AssignableTypesOf(TypeRef type, IReadOnlyList<GraphDocument> projectGraphs)
+    {
+        IReadOnlyList<TypeRef> bases = BaseTypesOf(type, projectGraphs);
+        return IsClass(type, projectGraphs) ? [.. bases, TypeRef.Object] : bases;
+    }
+
+    /// <summary>
+    /// The virtual method of <paramref name="owner"/>'s base classes that a method named <paramref name="name"/> with
+    /// <paramref name="parameterTypes"/> overrides, nearest class first; null when there is none.
+    /// </summary>
+    public ExternalMethod? OverriddenMethod(GraphDocument owner, string name, IReadOnlyList<TypeRef> parameterTypes, IEnumerable<GraphDocument> projectGraphs)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        ArgumentNullException.ThrowIfNull(parameterTypes);
+        return BaseTypesOf(TypeRef.ProjectType(owner.Name), projectGraphs)
+            .SelectMany(baseType => FindExternalType(baseType)?.Overridable ?? [])
+            .FirstOrDefault(method => method.Name == name && method.Parameters.Select(parameter => parameter.Type).SequenceEqual(parameterTypes));
+    }
+
+    /// <summary>
+    /// The virtual methods a class graph can override: those of its base classes, nearest class first, each signature once, in name
+    /// order. Empty for a class without a base type.
+    /// </summary>
+    public IReadOnlyList<ExternalMethod> OverridableMethods(GraphDocument owner, IEnumerable<GraphDocument> projectGraphs)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        return [.. BaseTypesOf(TypeRef.ProjectType(owner.Name), projectGraphs)
+            .SelectMany(baseType => FindExternalType(baseType)?.Overridable ?? [])
+            .DistinctBy(method => $"{method.Name}({string.Join(",", method.Parameters.Select(parameter => parameter.Type.SourceName))})")
+            .OrderBy(method => method.Name, StringComparer.Ordinal)];
+    }
+
     public void Register(NodeDefinition definition)
     {
         ArgumentNullException.ThrowIfNull(definition);
@@ -144,15 +200,33 @@ public sealed class NodeLibrary
                 return TypeRef.FromName(node.Properties.GetValueOrDefault(CollectionNodes.CollectionProperty), projectGraphs, graph) is { } collection
                     ? CollectionDefinitions(collection).FirstOrDefault(definition => definition.TypeId == collectionNode)
                     : null;
+            case SignalNodes.EmitTypeId or SignalNodes.OnTypeId:
+                return projectGraphs.FirstOrDefault(type => type.Id == node.Properties.GetValueOrDefault(TypeNodes.TypeProperty)) is { } signalType
+                    && SignalNodes.Of(signalType, node.Properties.GetValueOrDefault(SignalNodes.SignalProperty), projectGraphs) is { } signal
+                    ? node.Type == SignalNodes.EmitTypeId ? new EmitSignalNode(signal) : new OnSignalNode(signal)
+                    : null;
+            case TypeNodes.CastTypeId:
+                return TypeRef.FromName(node.Properties.GetValueOrDefault(TypeNodes.CastProperty), projectGraphs, graph) is { } castType
+                    && castType != TypeRef.String && !castType.IsList && !castType.IsDictionary && IsClass(castType, projectGraphs)
+                    ? generatedDefinitions.GetOrAdd(TypeNodes.CastTypeId + "\n" + castType.SourceName, _ => new CastNode(castType))
+                    : null;
             case string generic when genericMethods.TryGetValue(generic, out ExternalMethod? method):
                 return TypeRef.ArgumentsFromNames(node.Properties.GetValueOrDefault(ExternalApi.TypeArgumentsProperty), projectGraphs, graph) is { } typeArguments
                     && method.Instantiate(typeArguments) is { } instance
+                    && method.TypeParameters.Zip(typeArguments).All(pair => !method.ClassTypeParameters.Contains(pair.First) || IsClass(pair.Second, projectGraphs))
                     ? generatedDefinitions.GetOrAdd(generic + "\n" + TypeRef.ArgumentNames(typeArguments), _ => ExternalApi.CreateNode(instance))
                     : null;
             default:
                 return Find(node.Type);
         }
     }
+
+    // True when type satisfies a class constraint. A type parameter of the project's generic types is unconstrained, so it does not.
+    private bool IsClass(TypeRef type, IReadOnlyList<GraphDocument> projectGraphs) =>
+        type == TypeRef.String
+        || type.IsList || type.IsDictionary
+        || (type.IsProjectType && projectGraphs.Any(graph => graph.Kind == GraphKind.Class && graph.Name == type.Name))
+        || (type.IsExternal && FindExternalType(type) is { IsValueType: false });
 
     private NodeDefinition? ResolveTypeNode(GraphNode node, GraphDocument graph, IReadOnlyList<GraphDocument> projectGraphs)
     {
@@ -280,9 +354,16 @@ public sealed class NodeLibrary
         IEnumerable<NodeDefinition> generic = genericMethods.Values.Select(method => generatedDefinitions.GetOrAdd(
             method.TypeId + "\n" + ExternalApi.DefaultTypeArguments(method),
             _ => ExternalApi.CreateNode(method.Instantiate([.. method.TypeParameters.Select(_ => TypeRef.Int32)])!)));
+        // Cast To for each class of the project and each .NET class: the classes a value may turn out to be.
+        IEnumerable<NodeDefinition> casts = projectGraphs.Where(type => type.Kind == GraphKind.Class && type.TypeParameters.Count == 0)
+            .Select(type => TypeRef.ProjectType(type.Name))
+            .Concat(ExternalTypes.Where(type => !type.IsValueType).Select(type => type.Type))
+            .Select(type => generatedDefinitions.GetOrAdd(TypeNodes.CastTypeId + "\n" + type.SourceName, _ => new CastNode(type)));
         return Definitions
             .Concat(graphNodes.Concat(functions).Concat(typeNodes).OfType<NodeDefinition>())
             .Concat(generic)
+            .Concat(casts)
+            .Concat(projectGraphs.Where(type => type.Kind == GraphKind.Class).SelectMany(type => SignalNodes.For(type, projectGraphs)))
             .Concat(used.SelectMany(CollectionDefinitions));
     }
 

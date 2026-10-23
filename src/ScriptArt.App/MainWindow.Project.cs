@@ -95,7 +95,7 @@ public partial class MainWindow
     private void AddSection(string title, EventHandler<RoutedEventArgs>? add, IReadOnlyList<Control> rows)
     {
         bool collapsed = collapsedSections.Contains(title);
-        var header = new DockPanel { Background = (IBrush)this.FindResource("IdePanelHeaderBackground")!, Margin = new Thickness(0, 2, 0, 0) };
+        var header = new DockPanel { Background = Token("IdePanelHeaderBackground"), Margin = new Thickness(0, 2, 0, 0) };
         if (add is not null)
         {
             var plus = new Button { Content = "+", Padding = new Thickness(8, 0), Margin = new Thickness(0, 2, 4, 2), VerticalAlignment = VerticalAlignment.Center };
@@ -140,7 +140,7 @@ public partial class MainWindow
         {
             Child = content,
             Padding = new Thickness(18 + (indent * 16), 4, 8, 4),
-            Background = selected ? (IBrush)this.FindResource("IdeAccent")! : Brushes.Transparent,
+            Background = selected ? Token("IdeSelection") : Brushes.Transparent,
             Cursor = new Cursor(StandardCursorType.Hand),
             Focusable = true,
             [ToolTip.TipProperty] = tip,
@@ -204,7 +204,6 @@ public partial class MainWindow
         selectedVariableId = null;
         workspace!.OpenGraph(graph);
         ShowOpenGraph();
-        ShowGeneratedCode();
         SetStatus($"Opened {graph.Graph.Name}.");
     }
 
@@ -286,7 +285,7 @@ public partial class MainWindow
 
             if (commit && name != current && !Compiler.GraphCompiler.IsValidIdentifier(name))
             {
-                box.BorderBrush = (IBrush)this.FindResource("IdeError")!;
+                box.BorderBrush = Token("IdeError");
                 SetStatus($"'{name}' is not a valid C# name. Use letters, digits, and underscores, starting with a letter. Esc cancels.");
                 return;
             }
@@ -475,7 +474,7 @@ public partial class MainWindow
         };
         if (renamed is not null)
         {
-            LeftTabs.SelectedIndex = 0;
+            LeftTabs.SelectedItem = MyProjectTab;
             if (renamed != workspace.Editor.Graph.Id)
             {
                 SelectVariable(renamed);

@@ -268,7 +268,7 @@ public sealed class EndToEndTests
         }
     }
 
-    private static string RepositorySamples()
+    internal static string RepositorySamples()
     {
         for (DirectoryInfo? directory = new(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {

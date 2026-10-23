@@ -379,7 +379,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
             + $"{drawnNodes:N0} of {editor!.Graph.Nodes.Count:N0} nodes, {drawnWires:N0} of {editor.Graph.Connections.Count:N0} wires drawn · zoom {zoom:P0}");
 
         // Not cached like other text: it changes every frame.
-        var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface.Default, CanvasTheme.FontSize, CanvasTheme.Title);
+        var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface.Default, CanvasTheme.FontSize, CanvasTheme.OverlayText);
         var frame = new Rect(8, 8, formatted.Width + 16, formatted.Height + 12);
         context.DrawRectangle(CanvasTheme.MinimapBackground, CanvasTheme.MinimapBorder, frame, 4, 4);
         context.DrawText(formatted, new Point(16, 14));
@@ -751,6 +751,13 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
         InvalidateVisual();
     }
 
+    /// <summary>Redraws with the colors of <see cref="CanvasTheme"/> after it switched palettes.</summary>
+    public void ThemeChanged()
+    {
+        textCache.Clear();
+        RebuildLayouts();
+    }
+
     private void RebuildLayouts()
     {
         layouts.Clear();
@@ -1033,7 +1040,7 @@ internal sealed class NodeCanvas : Avalonia.Controls.Control
 
         // The title is the first line of the text, clipped to the box.
         string title = comment.Text.Split('\n', 2)[0].TrimEnd('\r');
-        FormattedText text = Text(title, CanvasTheme.CommentFontSize, CanvasTheme.Title, bold: true);
+        FormattedText text = Text(title, CanvasTheme.CommentFontSize, CanvasTheme.CommentTitle, bold: true);
         using (context.PushClip(header.Deflate(new Thickness(10, 0))))
         {
             context.DrawText(text, new Point(bounds.X + 10, bounds.Y + ((CanvasTheme.CommentHeaderHeight - text.Height) / 2)));

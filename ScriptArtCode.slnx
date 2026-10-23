@@ -12,5 +12,6 @@
     <Project Path="tests/ScriptArt.IntegrationTests/ScriptArt.IntegrationTests.csproj" />
     <Project Path="tests/ScriptArt.PerformanceTests/ScriptArt.PerformanceTests.csproj" />
     <Project Path="tests/ScriptArt.Tests/ScriptArt.Tests.csproj" />
+    <Project Path="tests/ScriptArt.UiTests/ScriptArt.UiTests.csproj" />
   </Folder>
 </Solution>
