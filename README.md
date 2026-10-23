@@ -1,31 +1,71 @@
+<div align="center">
+
 # ScriptArt Code
 
-A visual programming IDE for general-purpose C#/.NET 10 development. You connect nodes to describe program logic; a real compiler turns the graph into ordinary, readable C# inside a standard SDK-style project.
+**Draw your program. Get real C#.**
 
-**Visual graph → compiler → clean C# source → `dotnet build` → standalone application.**
+A visual programming IDE for .NET 10: connect nodes on a canvas, and a real compiler turns them into clean, readable C# you own.
 
-The generated program has no dependency on this IDE: no graph interpreter, no runtime library, no reflection. You can open it in Visual Studio, Rider, or VS Code and maintain it like any other C# project.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![.NET 10](https://img.shields.io/badge/.NET-10-512BD4.svg)](https://dotnet.microsoft.com/)
+[![Release](https://img.shields.io/github/v/release/Diginaat/scriptart-code?include_prereleases&label=release)](https://github.com/Diginaat/scriptart-code/releases)
+![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20Linux%20%7C%20macOS-555)
 
-## Status
+<img src="docs/images/hero-graph.png" alt="A ScriptArt Code graph that asks for a name, checks it with a Branch node, and prints a greeting" width="900">
 
-Phases 0 to 5 are complete: the visual editor, real programming capabilities (variables, loops, functions, collections, classes and structs, async, .NET APIs), IDE integration (handwritten files, generation preview, Go to Definition, node debugging, solutions), and extensibility and performance (node libraries, migration tooling, incremental and background compilation, packaging). See [docs/ROADMAP.md](docs/ROADMAP.md) for what exists and what comes next.
+</div>
 
-What works today:
+## Why ScriptArt Code
 
-- Create or open a project, edit its entry graph on a node canvas (pan, zoom, box-select, move, connect, disconnect, delete, undo/redo).
-- Built-in nodes: Entry, Branch, Return, console input/output, literals, arithmetic, comparisons, logic, string concatenation, conversions.
-- Live type-checked diagnostics linked to nodes and pins, shown on the canvas and in the Problems panel.
-- Readable C# generated through Roslyn syntax trees, with `if`/`else` structured from the execution graph, a node↔code source map, and Roslyn verification before anything is written.
-- Build and run with the installed .NET SDK from the IDE, with program input and output in the Output panel.
-- Handwritten `.cs` files edited in the IDE and checked as you type; a diff preview before generated files are written; Go to Definition (F12).
-- Debugging with breakpoints on nodes (F9, F5, F10, F11) through netcoredbg, with call stack and locals.
-- Solutions, NuGet packages, and project references through the `dotnet` CLI.
-- Node libraries from third parties, loaded only after you approve them (Tools → Node Libraries; see [docs/NODE_AUTHORING.md](docs/NODE_AUTHORING.md)).
-- A headless CLI (`vside generate|diff|build|run`, `vside migrate [--check]` to upgrade older project files with a backup) for scripts and CI.
+<table>
+<tr>
+<td width="33%" valign="top">
 
-## Example
+### 🎨 See your logic
 
-The `samples/ConsoleApplication` graph generates:
+Every step of your program is a node, every value a colored wire. Types have colors, so a string never plugs into a number by mistake.
+
+</td>
+<td width="33%" valign="top">
+
+### ⚙️ Real code, not a toy
+
+Graphs compile to ordinary C# with `if`, loops, classes, and `async`. No interpreter, no runtime library: open the result in any .NET editor.
+
+</td>
+<td width="33%" valign="top">
+
+### 🛡️ Safe to explore
+
+Live checks flag mistakes on the node itself, unlimited undo, and nothing is written until you have seen the diff.
+
+</td>
+</tr>
+</table>
+
+**Visual graph → compiler → clean C# → `dotnet build` → your standalone app.**
+
+## A tour
+
+### Loops, variables, and branches
+
+Build with For and While loops, Branch, Break and Continue. The minimap (lower right) keeps big graphs easy to move around.
+
+<img src="docs/images/loops.png" alt="A graph with a For Loop and a While Loop, with the minimap in the corner" width="900">
+
+### Classes, structs, and methods
+
+Add your own types in **My Project**, give them properties, methods, and constructors, and use them as nodes. Comments group related nodes and explain what they do.
+
+<img src="docs/images/classes-and-structs.png" alt="The Types sample: an Account class and a Point struct used from a graph, grouped in comments" width="900">
+
+### The C# it writes
+
+The **Code** tab shows the generated C# as you edit, mapped back to the nodes it came from. It is the same code that ships, readable enough to hand to a teammate.
+
+<img src="docs/images/generated-code.png" alt="The Code tab showing the generated C# for the graph above" width="900">
+
+For the graph at the top, that is:
 
 ```csharp
 internal static class Program
@@ -46,30 +86,61 @@ internal static class Program
 }
 ```
 
-## Getting started
+## What you can build with it
 
-Requires the .NET 10 SDK.
+| | |
+| --- | --- |
+| 🧩 **Building blocks** | Variables, lists and dictionaries, loops, functions with parameters and return values, try/catch, classes, structs, generics, `async`/`await` |
+| 📦 **The whole .NET world** | Call methods of .NET types, NuGet packages, and referenced projects as nodes |
+| ✍️ **Code where you want it** | Handwritten `.cs` files beside your graphs, checked as you type |
+| 🐞 **Debugging on the canvas** | Breakpoints on nodes (F9), step through (F10/F11), see the call stack and variables |
+| 🔍 **Find your way** | Go to Definition (F12), command palette (Ctrl+Shift+P), node search that understands everyday words and typos |
+| 🔌 **Extensible** | Node libraries from others, loaded only after you approve them ([how to write one](docs/NODE_AUTHORING.md)) |
+| 🤖 **Scriptable** | `vside generate`, `diff`, `build`, `run`, and `migrate` for scripts and CI |
+
+## Get started
+
+### Download
+
+Grab the latest build for Windows, Linux, or macOS from **[Releases](https://github.com/Diginaat/scriptart-code/releases)**, unpack it, and start `ScriptArtCode`. No .NET install is needed to start the IDE; to build and run your programs, install the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+
+> The builds are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper may ask for confirmation the first time.
+
+### Your first program in a minute
+
+1. **File → New Project**, pick a folder.
+2. **Right-click** the canvas, type `print`, and add **Print Line**.
+3. Drag from **Entry**'s white arrow to **Print Line**.
+4. Drag from Print Line's pink **Text** pin onto empty space, pick **String**, then double-click its value and type `Hello!`.
+5. Press **Ctrl+F5** to run it. The output appears in the **Output** tab.
+
+Or open one of the ten [samples](samples): HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, Methods.
+
+### From source
 
 ```sh
 dotnet build ScriptArtCode.slnx
-dotnet run --project src/ScriptArt.App                          # the IDE
-dotnet run --project src/ScriptArt.App -- samples/HelloWorld/HelloWorld.vside
+dotnet run --project src/ScriptArt.App -- samples/HelloWorld/HelloWorld.vside   # the IDE
 dotnet run --project src/ScriptArt.Cli -- run samples/ConsoleApplication/ConsoleApplication.vside
 dotnet test ScriptArtCode.slnx
 ```
 
 The samples also build without the IDE: `cd samples/HelloWorld && dotnet run`.
 
-To produce release artifacts (the self-contained IDE per runtime, the CLI as a .NET tool, and the node SDK packages) in `artifacts/`:
+<details>
+<summary><b>Packaging your own release</b></summary>
 
 ```sh
-eng/package.sh win-x64 linux-x64      # or: pwsh eng/package.ps1 -Runtimes win-x64
+eng/package.sh win-x64 linux-x64 osx-arm64      # or: pwsh eng/package.ps1 -Runtimes win-x64
 dotnet tool install -g --add-source artifacts/packages ScriptArt.Cli
 ```
 
-The published IDE starts without a .NET install; building and running projects still needs the .NET 10 SDK.
+This produces the self-contained IDE per runtime, the `vside` CLI as a .NET tool, and the node SDK packages in `artifacts/`.
 
-### Editor controls
+</details>
+
+<details>
+<summary><b>⌨️ Editor controls</b></summary>
 
 | Action | Input |
 | --- | --- |
@@ -105,7 +176,18 @@ The published IDE starts without a .NET install; building and running projects s
 | Breakpoints and stepping | F9 on a node; while paused F5 continues, F10 steps over, F11 steps into, Shift+F11 steps out. Needs [netcoredbg](https://github.com/Samsung/netcoredbg/releases) on PATH or in `VSIDE_NETCOREDBG` |
 | Packages, references, solution | Project menu, or **+** next to References in My Project |
 
-## Repository layout
+</details>
+
+## Status
+
+Phases 0 to 5 of the [roadmap](docs/ROADMAP.md) are done: the visual editor, real programming (variables to async), IDE integration (handwritten files, diff preview, debugging, solutions), and extensibility and performance. Next: production readiness (installer, autosave, accessibility), then Godot 4 C# games.
+
+## Security
+
+Opening a project never builds or runs it; building and running always need an explicit command. Treat projects from others as untrusted code: building runs MSBuild, and running executes the program with your permissions. A node library runs inside the IDE with your permissions, so the IDE loads only libraries you approved, and only while their files are unchanged. A project cannot load one.
+
+<details>
+<summary><b>Repository layout</b></summary>
 
 ```
 src/
@@ -116,16 +198,18 @@ src/
   ScriptArt.ProjectSystem  project files, generated-code ownership, dotnet build/run
   ScriptArt.App            Avalonia desktop IDE
   ScriptArt.Cli            headless generate/build/run
-tests/                               unit, integration (real dotnet builds), performance harness and baseline
-eng/                                 packaging scripts
-samples/                             HelloWorld, ConsoleApplication, Variables, Loops, Functions, Exceptions, Collections, Types, Dictionaries, Methods
-docs/                                architecture, compiler pipeline, formats, decisions, roadmap
+tests/                     unit, integration (real dotnet builds), performance harness and baseline
+eng/                       packaging scripts
+samples/                   ten sample projects
+docs/                      architecture, compiler pipeline, formats, decisions, roadmap
 ```
 
-## Security
-
-Opening a project never builds or runs it; building and running always require an explicit command. Treat projects from others as untrusted code: building runs MSBuild and running executes the program with your permissions. A node library runs inside the IDE with your permissions; the IDE loads only libraries you approved, and only while their files are unchanged. A project cannot load one.
+</details>
 
 ## Documentation
 
 [Architecture](docs/ARCHITECTURE.md) · [Compiler pipeline](docs/COMPILER_PIPELINE.md) · [Code generation](docs/CODE_GENERATION.md) · [Graph format](docs/GRAPH_FORMAT.md) · [Node authoring](docs/NODE_AUTHORING.md) · [Decisions](docs/DECISIONS.md) · [Testing](docs/TESTING.md) · [Performance](docs/PERFORMANCE.md) · [Roadmap](docs/ROADMAP.md)
+
+## License
+
+[MIT](LICENSE) © 2026 Diginaat

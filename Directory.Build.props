@@ -16,6 +16,8 @@
     <Company>Diginaat</Company>
     <RepositoryUrl>https://github.com/Diginaat/scriptart-code</RepositoryUrl>
     <PackageProjectUrl>https://github.com/Diginaat/scriptart-code</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 Diginaat</Copyright>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 </Project>
