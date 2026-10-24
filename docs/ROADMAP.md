@@ -86,7 +86,7 @@ Next: Phase 6, then Phase 7 (Godot 4 C# support).
 
 ## Phase 6 — Production readiness
 
-Goal: a release that people other than the developers can install, trust with their work, and upgrade. Released so far: `alpha-v0.1.0` (tag only; artifacts built by `eng/package.sh`), `v0.2.0-alpha` (Windows installer, packages for Windows, Linux, and macOS), `alpha-v0.2.1` (Enter adds the highlighted node in the action menu).
+Goal: a release that people other than the developers can install, trust with their work, and upgrade. Released so far: `alpha-v0.1.0` (tag only; artifacts built by `eng/package.sh`), `v0.2.0-alpha` (Windows installer, packages for Windows, Linux, and macOS), `alpha-v0.2.1` (Enter adds the highlighted node in the action menu), `alpha-v0.2.2` (app icon).
 
 Starting point (2026-10-23): no installer, no unhandled-exception handling (`Program.Main` starts Avalonia directly), no autosave, no preferences store (only `node-libraries.json` in `%AppData%/ScriptArtCode`), no automation peers for the canvas, no license file.
 

@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <AssemblyName>ScriptArtCode</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/ScriptArtCode.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
@@ -16,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="ScriptArt.UiTests" />
+    <AvaloniaResource Include="Assets/ScriptArtCode.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ScriptArt.NodeEditor\ScriptArt.NodeEditor.csproj" />

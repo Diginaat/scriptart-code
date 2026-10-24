@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- The app icon; ScriptArtCode.ico is rendered from this at 16 to 256 px. The website's favicon is the same drawing. -->
+  <rect width="32" height="32" rx="7" fill="#232a36"/>
+  <rect x="5" y="7" width="10" height="7" rx="2" fill="#3d7bd9"/>
+  <rect x="17" y="18" width="10" height="7" rx="2" fill="#a855c9"/>
+  <path d="M15 10.5c6 0 2 11 7 11" stroke="#e6edf3" stroke-width="2" fill="none"/>
+</svg>

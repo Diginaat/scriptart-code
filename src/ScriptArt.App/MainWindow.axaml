@@ -4,6 +4,7 @@
         xmlns:edit="using:AvaloniaEdit"
         x:Class="ScriptArt.App.MainWindow"
         Title="ScriptArt Code"
+        Icon="avares://ScriptArtCode/Assets/ScriptArtCode.ico"
         Width="1280" Height="800" MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen" WindowState="Maximized"
         Background="{DynamicResource IdeWindowBackground}">

@@ -26,7 +26,7 @@ if (Get-Command vpk -ErrorAction SilentlyContinue) {
     $version = (dotnet msbuild src/ScriptArt.App -getProperty:Version).Trim()
     foreach ($runtime in $Runtimes | Where-Object { $_ -like 'win-*' }) {
         vpk pack --packId ScriptArt.Code --packVersion $version --packTitle 'ScriptArt Code' --packAuthors Diginaat `
-            --packDir "$out/ScriptArtCode-$runtime" --mainExe ScriptArtCode.exe --runtime $runtime --outputDir "$out/installer-$runtime"
+            --packDir "$out/ScriptArtCode-$runtime" --mainExe ScriptArtCode.exe --icon src/ScriptArt.App/Assets/ScriptArtCode.ico --runtime $runtime --outputDir "$out/installer-$runtime"
         if ($LASTEXITCODE -ne 0) { throw "vpk pack failed with exit code $LASTEXITCODE" }
     }
 }
