@@ -165,14 +165,15 @@ public sealed partial class MainWindow : Window
                 AddNodeFromActionMenu(item);
             }
         };
-        ActionTree.KeyDown += (_, e) =>
+        // Tunnel: the focused TreeViewItem handles Enter itself, so a bubbling handler never sees it.
+        ActionTree.AddHandler(KeyDownEvent, (_, e) =>
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Enter && ActionTree.SelectedItem is TreeViewItem { Tag: NodeDefinition } item)
             {
-                AddNodeFromActionMenu(ActionTree.SelectedItem as TreeViewItem);
+                AddNodeFromActionMenu(item);
                 e.Handled = true;
             }
-        };
+        }, RoutingStrategies.Tunnel);
         ActionMenu.KeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape)

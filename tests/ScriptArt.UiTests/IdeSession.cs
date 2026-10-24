@@ -154,6 +154,7 @@ internal sealed class IdeSession : IDisposable
     {
         Key.Enter => PhysicalKey.Enter,
         Key.Escape => PhysicalKey.Escape,
+        Key.Down => PhysicalKey.ArrowDown,
         Key.Delete => PhysicalKey.Delete,
         Key.F2 => PhysicalKey.F2,
         Key.S => PhysicalKey.S,
