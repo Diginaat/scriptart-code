@@ -10,7 +10,7 @@
   </PropertyGroup>
   <!-- Product identity and packaging. Projects that ship as packages opt in with IsPackable (see eng/package.sh). -->
   <PropertyGroup>
-    <Version>0.2.0-alpha</Version>
+    <Version>0.2.1-alpha</Version>
     <Product>ScriptArt Code</Product>
     <Authors>Diginaat</Authors>
     <Company>Diginaat</Company>
